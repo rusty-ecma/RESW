@@ -33,7 +33,7 @@ fn main() {
 }
 ```
 
-If we were to run thw above, assuming that `example.js` exists, it would write the following in `example.out.js`.
+If we were to run the above, assuming that `example.js` exists, it would write the following in `example.out.js`.
 
 ```js
 // example.js
