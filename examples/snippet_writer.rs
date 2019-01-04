@@ -17,7 +17,7 @@ pub fn main() {
                 .expect("Couldn't read snippet.js");
     let p = Builder::new().module(module).js(s).build().expect("Failed to create parser");
     let f = File::create("./examples/snippet.out.js").expect("Failed to create out file");
-    let mut w = Writer::new(f);
+    let mut w = Writer::builder().quote('\'').build(f);
 
     for part in p {
         let part = part.expect("Failed to get part");

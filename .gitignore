@@ -1,2 +1,7 @@
 /target
 **/*.rs.bk
+examples/snippet.out.js
+examples/inserted.js
+out.log
+/.vscode/
+Cargo.lock
