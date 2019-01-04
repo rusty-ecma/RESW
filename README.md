@@ -38,12 +38,12 @@ If we were to run the above, assuming that `example.js` exists, it would write t
 ```js
 // example.js
 function thing() {
-    return 'stuff'
+    return 'stuff';
 }
 
 ```
 
-not super exciting but I did say the example would be trivial. Check out the examples directory for a few more, alightly less trivial examples.
+not super exciting but I did say the example would be trivial. Check out the examples directory for a few more, slightly less trivial examples.
 
 ## Notes
 ### Running the Examples
