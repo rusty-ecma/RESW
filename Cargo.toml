@@ -1,0 +1,10 @@
+[package]
+name = "resw"
+version = "0.1.0"
+authors = ["Robert Masen <r@robertmasen.pizza>"]
+edition = "2018"
+
+[dependencies]
+ressa = { path = "../resp" }
+log = "0.4"
+pretty_env_logger = "0.3"
