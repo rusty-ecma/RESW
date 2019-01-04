@@ -50,14 +50,14 @@ not super exciting but I did say the example would be trivial. Check out the exa
 `cargo run --example snippet_writer` will expect a _script_ unless you pass an argument "module" like this `cargo run --example snippet_writer -- module`
 
 ### That's Like Your Opinion... Man
-Currently I have made some personal style choices for the generated output. My ultimate vision for this crate is to allow for configuring a large number of these decisions until RESSA has a chance to add some needed features they will not be configurable. Here are a few things I can think of right now.
+Currently I have made some personal style choices for the generated output. My ultimate vision for this crate is to allow for configuring a large number of these decisions but until RESSA has a chance to add some needed features they will not be configurable. Here are a few things I can think of right now.
 
 - comments are never included in the output
 - empty function bodies are two braces on the same line seperated by a single space
 - empty if, try, and loop bodies are two braces seperated by an empty new line
 - new lines are always `\n`
 - function or function identifiers are writted with no space before `(`
-- function parapeter lists are not surrounded with empty space
+- function parameter lists are not surrounded with empty space
 - arry and object literals have trailing commas
 - object literals are always one property per line
 
@@ -65,7 +65,7 @@ Currently I have made some personal style choices for the generated output. My u
 I have some ambitous things in store for RESS/RESSA for the next year, changes there will ultimatly break what this crate can do but with time, those changes will greatly enhance this crates features. Some notible things in the works:
 
 #### RESS
-- a new allocation free version of the `Scanner` has been implemented but needs testinf.
+- a new allocation free version of the `Scanner` has been implemented but needs testing
 - I would like to add Typescript support
 
 #### RESSA 
@@ -73,10 +73,10 @@ I have some ambitous things in store for RESS/RESSA for the next year, changes t
   - this will allow RESW to increase the fedility of the generated JS
 
 ## Contributing
-If you are interested in helping, I always appreciate the help. At this point I would encourage you to look at improving RESS or RESSA before trying to find a way to contribut here. If you habe a contribution I ask that you please open an issue before digging too deep into it so we can both be on the same page. 
+If you are interested in helping, it woud be appreciayed. At this point I would encourage you to look at improving RESS or RESSA before trying to find a way to contribut here. If you have a contribution I ask that you please open an issue before digging too deep into it so we can both be on the same page. 
 
 ### Some places that would be great to see aome help
 - examples
-  - My imagination is only ao big, even just ideas for dev tools that might need a writer (that aren't a bable clone or js minifier) would be amazing
+  - My imagination is only so big, even just ideas for dev tools that might need a writer (that aren't a bable clone or js minifier) would be amazing
   - If you wanted to build a JS minifier I would be truely flattered
 
