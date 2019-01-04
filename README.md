@@ -1,7 +1,7 @@
 # RESW
 An experimental crate for writing JS from an AST provided by the [RESSA](https://github.com/freemasen/ressa) crate.
 
-Since RESSA's primary purpose is to enable developers to write their JS dev tools in Rust, this is an important part of that eco system. The experimental status of this project is due to the current instability in both RESS and RESSA, whem pinned to the versions listed in this crate's `Cargo.toml` the behavior should be sound.
+Since RESSA's primary purpose is to enable developers to write their JS dev tools in Rust, this is an important part of that eco system. The experimental status of this project is due to the current instability in both RESS and RESSA, when pinned to the versions listed in this crate's `Cargo.toml` the behavior should be sound.
 
 ## Basic Usage
 
