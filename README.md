@@ -75,8 +75,9 @@ I have some ambitous things in store for RESS/RESSA for the next year, changes t
 ## Contributing
 If you are interested in helping, it woud be appreciayed. At this point I would encourage you to look at improving RESS or RESSA before trying to find a way to contribut here. If you have a contribution I ask that you please open an issue before digging too deep into it so we can both be on the same page. 
 
-### Some places that would be great to see aome help
+### Some places that would be great to see some help
 - examples
   - My imagination is only so big, even just ideas for dev tools that might need a writer (that aren't a bable clone or js minifier) would be amazing
   - If you wanted to build a JS minifier I would be truely flattered
+    - Though currently there is no mechanizism not include new line characters
 
