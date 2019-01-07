@@ -2,6 +2,7 @@
 extern crate log;
 use ressa::node::*;
 use std::io::{Write, Error as IoError};
+use ress::{Comment, CommentKind};
 
 pub mod write_str;
 mod rewrite;
@@ -1776,7 +1777,14 @@ impl<T: Write> Writer<T> {
         let _ = self.out.write(s.as_bytes())?;
         Ok(())
     }
-
+    pub fn write_comment(&mut self, comment: Comment) -> Res {
+        match comment.kind {
+            CommentKind::Single => self.write(&format!("//{}", comment.content))?,
+            CommentKind::Multi => self.write(&format!("/*{}\n*/", comment.content))?,
+            CommentKind::Html => self.write(&format!("<!--{}-->{}", comment.content, comment.tail_content.unwrap_or(String::new())))?,
+        }
+        Ok(())
+    }
 }
 
 
