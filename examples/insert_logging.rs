@@ -6,7 +6,11 @@ use ressa::{
 use std::fs::{read_to_string, File};
 
 fn main() {
-    let js = read_to_string("./examples/insert_logging.js").expect("Unable to find js file");
+    pretty_env_logger::init();
+    let mut args = ::std::env::args();
+    let _ = args.next();
+    let file_name = args.next().unwrap_or(String::from("./examples/insert_logging.js"));
+    let js = read_to_string(file_name).expect("Unable to find js file");
     let p = Parser::new(&js).expect("Failed to create parser");
     let f = File::create("./examples/inserted.js").expect("failed to create file");
     let mut w = Writer::new(f);
@@ -92,7 +96,6 @@ fn map_class(class: &Class) -> Class {
 }
 
 fn map_class_prop(prefix: &str, prop: &Property) -> Property {
-    println!("{:#?}", prop);
     let mut prop = prop.clone();
     let mut args = match prop.kind {
         PropertyKind::Ctor => {
