@@ -8,9 +8,8 @@ pub fn re_write(s: &str, new_quote: char) -> Result<String, String> {
         return Ok(s.to_string())
     }
     let contents = &s[1..s.len().saturating_sub(1)];
-    let mut queue : VecDeque<_> = String::from(contents).chars().collect();
+    let mut queue: VecDeque<_> = String::from(contents).chars().collect();
     let mut s = format!("{}", new_quote);
-    println!("starting: {}", s);
     while let Some(c) = queue.pop_front() {
         if c != '\\' {
             if c == new_quote {
@@ -41,7 +40,6 @@ pub fn re_write(s: &str, new_quote: char) -> Result<String, String> {
         }
     }
     s.push(new_quote);
-    println!("result: {}", s);
     Ok(s)
 }
 
