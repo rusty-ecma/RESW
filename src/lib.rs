@@ -534,7 +534,7 @@ impl<T: Write> Writer<T> {
         self.write("debugger")
     }
     /// Attempts to write a block statement
-    /// ```
+    /// ```js
     /// {
     ///     var x = 0;
     /// }
@@ -1329,11 +1329,11 @@ impl<T: Write> Writer<T> {
         if unary.prefix {
             self.write_unary_operator(&unary.operator)?;
         }
-        let wrap_arg = if let Expression::Assignment(_) = &*unary.argument {
+        if let Expression::Assignment(_) = &*unary.argument {
             self.write_wrapped_expr(&unary.argument)?;
         } else {
             self.write_expr(&unary.argument)?;
-        };
+        }
         if !unary.prefix {
             self.write_unary_operator(&unary.operator)?;
         }
@@ -1735,7 +1735,7 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
     /// Write a literal
-    /// ```
+    /// ```js
     /// null
     /// 'string'
     /// "string"
@@ -1856,8 +1856,6 @@ impl<T: Write> Writer<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs::{File, remove_file};
-    use std::io::Read;
     #[test]
     fn write_empty_expression() {
         let mut f = write_str::WriteString::new();
@@ -1873,7 +1871,7 @@ mod test {
         let mut w = Writer::new(f.generate_child());
         w.write_debugger_stmt().unwrap();
         let s = f.get_string_lossy();
-        assert_eq!(s, "debugger;");
+        assert_eq!(s, "debugger");
     }
 
     #[test]
