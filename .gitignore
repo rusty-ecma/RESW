@@ -5,3 +5,8 @@ examples/inserted.js
 out.log
 /.vscode/
 Cargo.lock
+out.ron
+everything.es5.first.js
+everything.es5.second.js
+package-lock.json
+node_modules
