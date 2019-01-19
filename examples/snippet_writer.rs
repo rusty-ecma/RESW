@@ -20,7 +20,6 @@ pub fn main() {
     let mut w = Writer::builder().quote('\'').build(f);
 
     for part in p {
-        println!("{:#?}", part);
         let part = part.expect("Failed to get part");
         w.write_part(&part).expect(&format!("Failed to write {:?}", part));
     }

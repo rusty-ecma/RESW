@@ -10,3 +10,5 @@ everything.es5.first.js
 everything.es5.second.js
 package-lock.json
 node_modules
+moz-central
+test_failures

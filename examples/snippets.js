@@ -1,8 +1,1 @@
-function f() {
-    'string' 
-    + 0
-}
-
-function f() {
-    'string' + 0;
-}
+var callbackId = '_' + (callbacks.$$counter++).toString(36);

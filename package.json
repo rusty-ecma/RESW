@@ -1,5 +1,12 @@
 {
   "devDependencies": {
-    "everything.js": "^1.0.3"
+    "angular": "^1.5.11",
+    "dexie": "^2.0.4",
+    "everything.js": "^1.0.3",
+    "jquery": "^3.3.1",
+    "moment": "^2.23.0",
+    "react": "^16.7.0",
+    "react-dom": "^16.7.0",
+    "vue": "^2.5.22"
   }
 }
