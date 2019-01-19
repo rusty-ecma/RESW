@@ -1,0 +1,22 @@
+language: rust
+sudo: false
+matrix:
+  include:
+    - rust: stable
+      install:
+        - npm i
+      cache:
+        - directories:
+          - node_modules
+          - /home/travis/.cargo
+          - moz-central
+      before_cache:
+        - rm -rf /home/travis/.cargo/registry
+      script:
+        - cargo test --features moz_central
+      after_script:
+      stages:
+        after_script:
+          - if branch in (master, next)
+notifications:
+  email: never
