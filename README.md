@@ -24,7 +24,7 @@ use srd::fs::{read_to_string, File);
 
 fn main() {
     let js = read_to_string("example.js").expect("failed to read example.js");
-    let p = Parser::new(&js).expect("failed to create parser);
+    let p = Parser::new(&js).expect("failed to create parser");
     let f = Filem:create("example.out.js");
     let mut w = Writer::new(f);
     for part in p {
