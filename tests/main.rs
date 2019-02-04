@@ -102,11 +102,6 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_writer = Writer::new(first_write.generate_child());
     for part in first_parser {
         let part = part.expect("failed to parse part in first pass");
-        if let ressa::node::ProgramPart::Statement(ressa::node::Statement::Expr(ressa::node::Expression::Function(ref func))) = part {
-            if func.generator {
-                println!("break");
-            }
-        }
         first_writer.write_part(&part).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
@@ -128,9 +123,9 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
 
 fn write_failure(name: &str, first: &str, second: &str) {
     use std::io::Write;
-    let mut f1 = ::std::fs::File::create(&format!("{}.first.js", name)).expect("Failed to create first failure file");
+    let mut f1 = ::std::fs::File::create(&format!("test_failures/{}.first.js", name)).expect("Failed to create first failure file");
     f1.write_all(first.as_bytes()).expect("failed to write to first failure file");
-    let mut f2 = ::std::fs::File::create(&format!("{}.second.js", name)).expect("Failed to create second failure file");
+    let mut f2 = ::std::fs::File::create(&format!("test_failures/{}.second.js", name)).expect("Failed to create second failure file");
     f2.write_all(second.as_bytes()).expect("failed to write second failure file");
 }
 

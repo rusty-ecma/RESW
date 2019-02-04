@@ -1364,26 +1364,6 @@ impl<T: Write> Writer<T> {
         self.write(" ")?;
         self.write_function_body(&func.body)
     }
-
-    fn _write_function(&mut self, func: &Function, ignore_generator: bool) -> Res {
-        trace!("write_function");
-        if func.is_async {
-            self.write("async ")?;
-        }
-        self.write("function")?;
-        if let Some(ref id) = func.id {
-            self.write(" ")?;
-            if func.generator && !ignore_generator {
-                self.write("*")?;
-            }
-            self.write(id)?;
-        } else if func.generator {
-            self.write("*")?;
-        }
-        self.write_function_args(&func.params)?;
-        self.write(" ")?;
-        self.write_function_body(&func.body)
-    }
     /// Write a unary expression
     /// ```js
     /// delete x
