@@ -8,9 +8,9 @@ license = "MIT"
 readme = "./README.md"
 repository = "https://github.com/FreeMasen/RESW"
 
-
 [dependencies]
-ressa = "0.4.1"
+ressa = "0.5.1"
+resast = "0.2.0"
 log = "0.4"
 pretty_env_logger = "0.3"
 ress = "0.6"

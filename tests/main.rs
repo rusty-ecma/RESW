@@ -101,7 +101,13 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let first_parser = Builder::new().module(module).js(js).build().expect("Failed to create parser");
     let mut first_writer = Writer::new(first_write.generate_child());
     for part in first_parser {
-        let part = part.expect("failed to parse part in first pass");
+        let part = match part {
+            Ok(part) => part,
+            Err(e) => {
+                println!("Error parsing part in first pass {}", e);
+                break;
+            },
+        };
         first_writer.write_part(&part).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
@@ -111,8 +117,14 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
         let part = match part {
             Ok(part) => part,
             Err(e) => {
-                println!("{}", e);
-                return (first_pass, None)
+                println!("Error parsing part in second pass {}", e);
+                let parsed = second_write.get_string().expect("Invalid utf-8 written to second write");
+                let second_pass = if parsed.len() == 0 {
+                    None
+                } else {
+                    Some(parsed)
+                };
+                return (first_pass, second_pass)
             },
         };
         second_writer.write_part(&part).expect("failed to write part");
@@ -140,11 +152,22 @@ pub(crate) fn check_round_trips(name: &str, first: &str, second: &Option<String>
     if let Some(second) = second {
         if first != second {
             write_failure(name, first, second);
-            panic!("Double round trip failed for {0}\ncheck ./{0}.first.js and ./{0}.second.js", name);
+            panic!("Double round trip failed for {0}\ncheck ./test_failures/{0}.first.js and ./test_failures/{0}.second.js", name);
         }
     } else {
-        ::std::fs::write(&format!("{}.first.js", name), first).expect("Failed to write file");
-        panic!("Double round trip failed to parse second pass for {0}\n chec ./{0}.first.js", name);
+        ::std::fs::write(&format!("test_failures/{}.first.js", name), first).expect("Failed to write file");
+        panic!("Double round trip failed to parse second pass for {0}\n chec ./test_failures/{0}.first.js", name);
     }
 }
 
+#[test]
+fn new_member_expr_failure() {
+    let js =
+"function isElement(node) {
+  return !!(node &&
+    (node.nodeName  // We are a direct element.
+    || (node.prop && node.attr && node.find)));  // We have an on and find method part of jQuery API.
+}";
+    let (first, second) = double_round_trip(js, false);
+    check_round_trips("new_member_expr_failure", &first, &second);
+}

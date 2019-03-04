@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 use ress::{Comment, CommentKind};
-use ressa::node::*;
+use resast::prelude::*;
 use std::io::{Error as IoError, Write};
 
 mod rewrite;
@@ -126,7 +126,7 @@ impl<T: Write> Writer<T> {
     pub fn write_program(&mut self, program: &Program) -> Res {
         let parts = match program {
             Program::Script(ref parts) => parts,
-            Program::Module(ref parts) => parts,
+            Program::Mod(ref parts) => parts,
         };
         for ref part in parts {
             self.write_part(part)?;
@@ -148,28 +148,28 @@ impl<T: Write> Writer<T> {
         self.write_leading_whitespace()?;
         match part {
             ProgramPart::Decl(decl) => self.write_decl(decl)?,
-            ProgramPart::Directive(dir) => self.write_directive(dir)?,
-            ProgramPart::Statement(stmt) => self.write_stmt(stmt)?,
+            ProgramPart::Dir(dir) => self.write_directive(dir)?,
+            ProgramPart::Stmt(stmt) => self.write_stmt(stmt)?,
         }
         Ok(())
     }
     /// Attempt to write a `Declaration` to the `impl Write`
-    pub fn write_decl(&mut self, decl: &Declaration) -> Res {
+    pub fn write_decl(&mut self, decl: &Decl) -> Res {
         trace!("write_decl");
         match decl {
-            Declaration::Variable(ref kind, ref decls) => self.write_variable_decls(kind, decls)?,
-            Declaration::Class(ref class) => {
+            Decl::Variable(ref kind, ref decls) => self.write_variable_decls(kind, decls)?,
+            Decl::Class(ref class) => {
                 self.at_top_level = false;
                 self.write_class(class)?;
                 self.write_new_line()?;
             },
-            Declaration::Function(ref func) => {
+            Decl::Function(ref func) => {
                 self.at_top_level = false;
                 self.write_function(func)?;
                 self.write_new_line()?;
             },
-            Declaration::Export(ref exp) => self.write_export_decl(exp)?,
-            Declaration::Import(ref imp) => self.write_import_decl(imp)?,
+            Decl::Export(ref exp) => self.write_export_decl(exp)?,
+            Decl::Import(ref imp) => self.write_import_decl(imp)?,
         };
         Ok(())
     }
@@ -195,7 +195,7 @@ impl<T: Write> Writer<T> {
         self.write_new_line()
     }
     /// Attempt to write a `Class` to the `impl Write`, used for both
-    /// writing the contents of `Declaration::Class` and `Expression::Class`
+    /// writing the contents of `Declaration::Class` and `Expr::Class`
     ///
     /// ```js
     /// // class expression
@@ -247,13 +247,13 @@ impl<T: Write> Writer<T> {
     /// export * from 'module';
     /// export {Stuff} from 'other_module';
     /// ```
-    pub fn write_export_decl(&mut self, exp: &ModuleExport) -> Res {
+    pub fn write_export_decl(&mut self, exp: &ModExport) -> Res {
         trace!("write_export_decl");
         self.write("export ")?;
         match exp {
-            ModuleExport::All(ref a) => self.write_all_export(a)?,
-            ModuleExport::Default(ref d) => self.write_default_export(d)?,
-            ModuleExport::Named(ref n) => self.write_named_export(n)?,
+            ModExport::All(ref a) => self.write_all_export(a)?,
+            ModExport::Default(ref d) => self.write_default_export(d)?,
+            ModExport::Named(ref n) => self.write_named_export(n)?,
         }
         Ok(())
     }
@@ -330,7 +330,7 @@ impl<T: Write> Writer<T> {
     /// import {Thing, Place} from 'module';
     /// import Stuff from 'other_module';
     /// ```
-    pub fn write_import_decl(&mut self, imp: &ModuleImport) -> Res {
+    pub fn write_import_decl(&mut self, imp: &ModImport) -> Res {
         trace!("write_import_decl");
         self.write("import ")?;
         if imp.specifiers.len() == 0 {
@@ -417,9 +417,9 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// 'use strict';
     /// ```
-    pub fn write_directive(&mut self, dir: &Directive) -> Res {
+    pub fn write_directive(&mut self, dir: &Dir) -> Res {
         trace!("write_directive");
-        self.write_literal(&dir.expression)?;
+        self.write_literal(&dir.expr)?;
         self.write_empty_stmt()?;
         self.write_new_line()?;
         Ok(())
@@ -449,23 +449,23 @@ impl<T: Write> Writer<T> {
         };
         self.write(s)
     }
-    /// Attempts to write the contents of a `Statement`
-    pub fn write_stmt(&mut self, stmt: &Statement) -> Res {
+    /// Attempts to write the contents of a `Stmt`
+    pub fn write_stmt(&mut self, stmt: &Stmt) -> Res {
         trace!("write_stmt");
         let mut semi = true;
         let mut new_line = true;
         let cached_state = self.at_top_level;
         match stmt {
-            Statement::Empty => {
+            Stmt::Empty => {
                 new_line = false;
             },
-            Statement::Debugger => self.write_debugger_stmt()?,
-            Statement::Expr(ref stmt) => {
+            Stmt::Debugger => self.write_debugger_stmt()?,
+            Stmt::Expr(ref stmt) => {
                 let wrap = match stmt {
-                    Expression::Literal(_)
-                    | Expression::Object(_)
-                    | Expression::Function(_) 
-                    | Expression::Binary(_) => true,
+                    Expr::Literal(_)
+                    | Expr::Object(_)
+                    | Expr::Function(_) 
+                    | Expr::Binary(_) => true,
                     _ => false,
                 };
                 if wrap {
@@ -474,59 +474,59 @@ impl<T: Write> Writer<T> {
                     self.write_expr(stmt)?
                 }
             },
-            Statement::Block(ref stmt) => {
+            Stmt::Block(ref stmt) => {
                 self.at_top_level = false;
                 self.write_block_stmt(stmt)?;
                 semi = false;
                 new_line = false;
                 self.at_top_level = cached_state;
             }
-            Statement::With(ref stmt) => {
+            Stmt::With(ref stmt) => {
                 self.write_with_stmt(stmt)?;
                 semi = false;
             }
-            Statement::Return(ref stmt) => self.write_return_stmt(stmt)?,
-            Statement::Labeled(ref stmt) => {
+            Stmt::Return(ref stmt) => self.write_return_stmt(stmt)?,
+            Stmt::Labeled(ref stmt) => {
                 self.write_labeled_stmt(stmt)?;
                 semi = false;
             }
-            Statement::Break(ref stmt) => self.write_break_stmt(stmt)?,
-            Statement::Continue(ref stmt) => self.write_continue_stmt(stmt)?,
-            Statement::If(ref stmt) => {
+            Stmt::Break(ref stmt) => self.write_break_stmt(stmt)?,
+            Stmt::Continue(ref stmt) => self.write_continue_stmt(stmt)?,
+            Stmt::If(ref stmt) => {
                 self.write_if_stmt(stmt)?;
                 semi = false;
             }
-            Statement::Switch(ref stmt) => {
+            Stmt::Switch(ref stmt) => {
                 self.at_top_level = false;
                 self.write_switch_stmt(stmt)?;
                 semi = false;
             }
-            Statement::Throw(ref stmt) => self.write_throw_stmt(stmt)?,
-            Statement::Try(ref stmt) => {
+            Stmt::Throw(ref stmt) => self.write_throw_stmt(stmt)?,
+            Stmt::Try(ref stmt) => {
                 self.write_try_stmt(stmt)?;
                 semi = false;
             }
-            Statement::While(ref stmt) => {
+            Stmt::While(ref stmt) => {
                 new_line = self.write_while_stmt(stmt)?;
                 semi = false;
             }
-            Statement::DoWhile(ref stmt) => self.write_do_while_stmt(stmt)?,
-            Statement::For(ref stmt) => {
+            Stmt::DoWhile(ref stmt) => self.write_do_while_stmt(stmt)?,
+            Stmt::For(ref stmt) => {
                 self.at_top_level = false;
                 new_line = self.write_for_stmt(stmt)?;
                 semi = false;
             }
-            Statement::ForIn(ref stmt) => {
+            Stmt::ForIn(ref stmt) => {
                 self.at_top_level = false;
                 new_line = self.write_for_in_stmt(stmt)?;
                 semi = false;
             }
-            Statement::ForOf(ref stmt) => {
+            Stmt::ForOf(ref stmt) => {
                 self.at_top_level = false;
                 new_line = self.write_for_of_stmt(stmt)?;
                 semi = false;
             }
-            Statement::Var(ref stmt) => self.write_var_stmt(stmt)?,
+            Stmt::Var(ref stmt) => self.write_var_stmt(stmt)?,
         };
         if semi {
             self.write_empty_stmt()?;
@@ -566,13 +566,13 @@ impl<T: Write> Writer<T> {
         self.write_close_brace()?;
         Ok(())
     }
-    /// Attempts to write a `WithStatement`
+    /// Attempts to write a `WithStmt`
     /// ```js
     /// With(Math) {
     ///     var y = random() * 100;
     /// }
     /// ```
-    pub fn write_with_stmt(&mut self, expr: &WithStatement) -> Res {
+    pub fn write_with_stmt(&mut self, expr: &WithStmt) -> Res {
         trace!("write_with_stmt");
         self.write("with (")?;
         self.write_expr(&expr.object)?;
@@ -580,7 +580,7 @@ impl<T: Write> Writer<T> {
         self.write_stmt(&expr.body)?;
         Ok(())
     }
-    /// Attempts to write a `ReturnStatement`
+    /// Attempts to write a `ReturnStmt`
     /// ```js
     /// function one() {
     ///     return 'things';
@@ -589,7 +589,7 @@ impl<T: Write> Writer<T> {
     ///     return;
     /// }
     /// ```
-    pub fn write_return_stmt(&mut self, expr: &Option<Expression>) -> Res {
+    pub fn write_return_stmt(&mut self, expr: &Option<Expr>) -> Res {
         trace!("write_return_stmt");
         self.write("return")?;
         if let Some(ref e) = expr {
@@ -598,7 +598,7 @@ impl<T: Write> Writer<T> {
         }
         Ok(())
     }
-    /// Attempts to write a `LabeledStatement`
+    /// Attempts to write a `LabeledStmt`
     /// ```js
     /// label: {
     ///     if (true) {
@@ -606,7 +606,7 @@ impl<T: Write> Writer<T> {
     ///     }
     /// }
     /// ```
-    pub fn write_labeled_stmt(&mut self, expr: &LabeledStatement) -> Res {
+    pub fn write_labeled_stmt(&mut self, expr: &LabeledStmt) -> Res {
         trace!("write_labeled_stmt");
         self.write_ident(&expr.label)?;
         self.write(": ")?;
@@ -655,7 +655,7 @@ impl<T: Write> Writer<T> {
         }
         Ok(())
     }
-    /// Attempts to write an `IfStatement`
+    /// Attempts to write an `IfStmt`
     /// ```js
     /// if ((Math.random() * 100) > 50) {
     ///
@@ -665,19 +665,19 @@ impl<T: Write> Writer<T> {
     ///
     /// }
     /// ```
-    pub fn write_if_stmt(&mut self, expr: &IfStatement) -> Res {
+    pub fn write_if_stmt(&mut self, expr: &IfStmt) -> Res {
         trace!("write_if_stmt");
         self.write("if (")?;
         self.write_expr(&expr.test)?;
         self.write(") ")?;
-        if let Statement::Empty = &*expr.consequent {
+        if let Stmt::Empty = &*expr.consequent {
             self.write_block_stmt(&[])?;
         } else {
             self.write_stmt(&expr.consequent)?;
         }
         if let Some(ref alt) = &expr.alternate {
             self.write(" else ")?;
-            if let Statement::Empty = &**alt {
+            if let Stmt::Empty = &**alt {
                 self.write_block_stmt(&[])?;
             } else {
                 self.write_stmt(alt)?;
@@ -685,14 +685,14 @@ impl<T: Write> Writer<T> {
         }
         Ok(())
     }
-    /// Attempts to write a `SwitchStatement`
+    /// Attempts to write a `SwitchStmt`
     /// ```js
     /// switch (Math.floor(Math.random() * 5)) {
     ///     case 0:
     ///     default:
     /// }
     /// ```
-    pub fn write_switch_stmt(&mut self, switch: &SwitchStatement) -> Res {
+    pub fn write_switch_stmt(&mut self, switch: &SwitchStmt) -> Res {
         trace!("write_switch_stmt");
         self.write("switch (")?;
         self.write_expr(&switch.discriminant)?;
@@ -734,7 +734,7 @@ impl<T: Write> Writer<T> {
         self.current_indent += 1;
         let mut decrease_indent = true;
         for ref part in &case.consequent {
-            if let ProgramPart::Statement(Statement::Break(_)) = part {
+            if let ProgramPart::Stmt(Stmt::Break(_)) = part {
                 self.current_indent = self.current_indent.saturating_sub(1);
                 decrease_indent = false;
             }
@@ -755,7 +755,7 @@ impl<T: Write> Writer<T> {
     ///     throw new Error('Things');
     /// }
     /// ```
-    pub fn write_throw_stmt(&mut self, expr: &Expression) -> Res {
+    pub fn write_throw_stmt(&mut self, expr: &Expr) -> Res {
         trace!("write_throw_stmt");
         self.write("throw ")?;
         self.write_expr(&expr)?;
@@ -771,7 +771,7 @@ impl<T: Write> Writer<T> {
     ///
     /// }
     /// ```
-    pub fn write_try_stmt(&mut self, stmt: &TryStatement) -> Res {
+    pub fn write_try_stmt(&mut self, stmt: &TryStmt) -> Res {
         trace!("write_try_stmt");
         self.write("try ")?;
         self.write_block_stmt(&stmt.block)?;
@@ -795,13 +795,13 @@ impl<T: Write> Writer<T> {
     /// while (true) {
     /// }
     /// ```
-    pub fn write_while_stmt(&mut self, stmt: &WhileStatement) -> Result<bool, IoError> {
+    pub fn write_while_stmt(&mut self, stmt: &WhileStmt) -> Result<bool, IoError> {
         trace!("write_while_stmt");
         let mut ret = false;
         self.write("while (")?;
         self.write_expr(&stmt.test)?;
         self.write(") ")?;
-        if let Statement::Block(_) = &*stmt.body {
+        if let Stmt::Block(_) = &*stmt.body {
             ret = true;
         }
         self.write_stmt(&stmt.body)?;
@@ -812,10 +812,10 @@ impl<T: Write> Writer<T> {
     /// do {
     ///
     /// } while(true)
-    pub fn write_do_while_stmt(&mut self, stmt: &DoWhileStatement) -> Res {
+    pub fn write_do_while_stmt(&mut self, stmt: &DoWhileStmt) -> Res {
         trace!("write_do_while_stmt");
         self.write("do")?;
-        if let Statement::Empty = &*stmt.body {
+        if let Stmt::Empty = &*stmt.body {
             self.write("; ")?;
         } else {
             self.write(" ")?;
@@ -832,7 +832,7 @@ impl<T: Write> Writer<T> {
     /// for (;;) {
     ///     break;
     /// }
-    pub fn write_for_stmt(&mut self, stmt: &ForStatement) -> Result<bool, IoError> {
+    pub fn write_for_stmt(&mut self, stmt: &ForStmt) -> Result<bool, IoError> {
         trace!("write_for_stmt");
         self.write("for (")?;
         if let Some(ref init) = &stmt.init {
@@ -847,7 +847,7 @@ impl<T: Write> Writer<T> {
             self.write_expr(update)?;
         }
         self.write(") ")?;
-        let ret = if let Statement::Block(_) = &*stmt.body {
+        let ret = if let Stmt::Block(_) = &*stmt.body {
             true
         } else {
             false
@@ -881,7 +881,7 @@ impl<T: Write> Writer<T> {
     ///
     /// }
     /// ```
-    pub fn write_for_in_stmt(&mut self, stmt: &ForInStatement) -> Result<bool, IoError> {
+    pub fn write_for_in_stmt(&mut self, stmt: &ForInStmt) -> Result<bool, IoError> {
         trace!("write_for_in_stmt");
         self.write("for (")?;
         self.write_loop_left(&stmt.left)?;
@@ -889,7 +889,7 @@ impl<T: Write> Writer<T> {
         self.write_expr(&stmt.right)?;
         self.write(") ")?;
         self.write_stmt(&stmt.body)?;
-        let ret = if let Statement::Block(_) = &*stmt.body {
+        let ret = if let Stmt::Block(_) = &*stmt.body {
             true
         } else {
             false
@@ -902,7 +902,7 @@ impl<T: Write> Writer<T> {
     ///
     /// }
     /// ```
-    pub fn write_for_of_stmt(&mut self, stmt: &ForOfStatement) -> Result<bool, IoError> {
+    pub fn write_for_of_stmt(&mut self, stmt: &ForOfStmt) -> Result<bool, IoError> {
         trace!("write_for_of_stmt");
         self.write("for (")?;
         self.write_loop_left(&stmt.left)?;
@@ -910,7 +910,7 @@ impl<T: Write> Writer<T> {
         self.write_expr(&stmt.right)?;
         self.write(") ")?;
         self.write_stmt(&stmt.body)?;
-        let ret = if let Statement::Block(_) = &*stmt.body {
+        let ret = if let Stmt::Block(_) = &*stmt.body {
             true
         } else {
             false
@@ -920,7 +920,7 @@ impl<T: Write> Writer<T> {
     /// Attempts to write for first part of a for of or for in loop's parenthetical
     pub fn write_loop_left(&mut self, left: &LoopLeft) -> Res {
         match left {
-            LoopLeft::Pattern(ref pat) => self.write_pattern(pat)?,
+            LoopLeft::Pat(ref pat) => self.write_pattern(pat)?,
             LoopLeft::Variable(ref kind, ref var) => {
                 self.write_variable_kind(kind)?;
                 self.write_variable_decl(var)?;
@@ -949,21 +949,21 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
     /// Write the contents of a pattern
-    pub fn write_pattern(&mut self, pattern: &Pattern) -> Res {
+    pub fn write_pattern(&mut self, pattern: &Pat) -> Res {
         trace!("write_pattern");
         match pattern {
-            Pattern::Identifier(ref i) => self.write(i),
-            Pattern::Object(ref o) => self.write_object_pattern(o),
-            Pattern::Array(ref a) => self.write_array_pattern(a.as_slice()),
-            Pattern::RestElement(ref r) => self.write_rest_element(r),
-            Pattern::Assignment(ref a) => self.write_assignment_pattern(a),
+            Pat::Identifier(ref i) => self.write(i),
+            Pat::Object(ref o) => self.write_object_pattern(o),
+            Pat::Array(ref a) => self.write_array_pattern(a.as_slice()),
+            Pat::RestElement(ref r) => self.write_rest_element(r),
+            Pat::Assignment(ref a) => self.write_assignment_pattern(a),
         }
     }
     /// Write an object pattern
     /// ```js
     /// let {x, y} = {x: 100, y: 0};
     /// ```
-    pub fn write_object_pattern(&mut self, obj: &ObjectPattern) -> Res {
+    pub fn write_object_pattern(&mut self, obj: &ObjectPat) -> Res {
         trace!("write_object_pattern");
         if obj.len() == 0 {
             self.write("{}")?;
@@ -978,8 +978,8 @@ impl<T: Write> Writer<T> {
                 after_first = true;
             }
             match part {
-                ObjectPatternPart::Assignment(ref prop) => self.write_property(prop)?,
-                ObjectPatternPart::Rest(ref pat) => self.write_rest_pattern_part(pat)?,
+                ObjectPatPart::Assignment(ref prop) => self.write_property(prop)?,
+                ObjectPatPart::Rest(ref pat) => self.write_rest_pattern_part(pat)?,
             }
         }
 
@@ -1006,7 +1006,7 @@ impl<T: Write> Writer<T> {
     pub fn write_init_property(&mut self, prop: &Property) -> Res {
         trace!("write_init_property");
         match &prop.value {
-            PropertyValue::Expr(Expression::Function(_)) => return self.write_property_method(prop),
+            PropertyValue::Expr(Expr::Function(_)) => return self.write_property_method(prop),
             _ => (),
         }
         self.write_property_key(&prop.key, prop.computed)?;
@@ -1017,7 +1017,7 @@ impl<T: Write> Writer<T> {
             match &prop.value {
                 PropertyValue::None => (),
                 PropertyValue::Expr(_)
-                | PropertyValue::Pattern(_) => {
+                | PropertyValue::Pat(_) => {
                     self.write(" = ")?;
                     self.write_property_value(&prop.value)?;
                 }
@@ -1061,7 +1061,7 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_property_method(&mut self, prop: &Property) -> Res {
         trace!("write_property_method");
-        if let PropertyValue::Expr(Expression::Function(ref func)) = prop.value {
+        if let PropertyValue::Expr(Expr::Function(ref func)) = prop.value {
             if func.is_async {
                 self.write("async ")?;
             }
@@ -1101,7 +1101,7 @@ impl<T: Write> Writer<T> {
         trace!("write_function_arg");
         match arg {
             FunctionArg::Expr(ref ex) => self.write_expr(ex)?,
-            FunctionArg::Pattern(ref pa) => self.write_pattern(pa)?,
+            FunctionArg::Pat(ref pa) => self.write_pattern(pa)?,
         }
         Ok(())
     }
@@ -1134,7 +1134,7 @@ impl<T: Write> Writer<T> {
     pub fn write_ctor_property(&mut self, prop: &Property) -> Res {
         trace!("write_ctor_property");
         self.write("constructor")?;
-        if let PropertyValue::Expr(Expression::Function(ref func)) = prop.value {
+        if let PropertyValue::Expr(Expr::Function(ref func)) = prop.value {
             self.write_function_args(&func.params)?;
             self.write_function_body(&func.body)?;
         } else {
@@ -1152,7 +1152,7 @@ impl<T: Write> Writer<T> {
         match key {
             PropertyKey::Expr(ref e) => self.write_expr(e)?,
             PropertyKey::Literal(ref l) => self.write_literal(l)?,
-            PropertyKey::Pattern(ref p) => self.write_pattern(p)?,
+            PropertyKey::Pat(ref p) => self.write_pattern(p)?,
         }
         if computed {
             self.write("]")?;
@@ -1164,7 +1164,7 @@ impl<T: Write> Writer<T> {
         trace!("write_property_value");
         match value {
             PropertyValue::Expr(ref e) => self.write_expr(e)?,
-            PropertyValue::Pattern(ref p) => self.write_pattern(p)?,
+            PropertyValue::Pat(ref p) => self.write_pattern(p)?,
             PropertyValue::None => (),
         }
         Ok(())
@@ -1173,7 +1173,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// let x = [...y];
     /// ```
-    pub fn write_rest_pattern_part(&mut self, pat: &Pattern) -> Res {
+    pub fn write_rest_pattern_part(&mut self, pat: &Pat) -> Res {
         trace!("write_rest_pattern_part");
         self.write_pattern(pat)?;
         Ok(())
@@ -1182,7 +1182,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// let [x, y] = [1, 2];
     /// ```
-    pub fn write_array_pattern(&mut self, arr: &[Option<ArrayPatternPart>]) -> Res {
+    pub fn write_array_pattern(&mut self, arr: &[Option<ArrayPatPart>]) -> Res {
         trace!("write_array_pattern");
         if arr.len() == 0 {
             self.write("[]")?;
@@ -1193,8 +1193,8 @@ impl<T: Write> Writer<T> {
         for (i, ref p) in arr.iter().enumerate() {
             if let Some(ref part) = p {
                 match &part {
-                    ArrayPatternPart::Expr(e) => self.write_expr(e)?,
-                    ArrayPatternPart::Patt(p) => self.write_pattern(p)?,
+                    ArrayPatPart::Expr(e) => self.write_expr(e)?,
+                    ArrayPatPart::Pat(p) => self.write_pattern(p)?,
                 }
             }
             if i < last_idx {
@@ -1205,7 +1205,7 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
-    pub fn write_rest_element(&mut self, pat: &Pattern) -> Res {
+    pub fn write_rest_element(&mut self, pat: &Pat) -> Res {
         trace!("write_rest_element");
         self.write("...")?;
         self.write_pattern(pat)?;
@@ -1215,7 +1215,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// let x = [...y];
     /// ```
-    pub fn write_assignment_pattern(&mut self, assignment: &AssignmentPattern) -> Res {
+    pub fn write_assignment_pattern(&mut self, assignment: &AssignmentPat) -> Res {
         trace!("write_assignment_pattern");
         self.write_pattern(&assignment.left)?;
         self.write(" = ")?;
@@ -1223,56 +1223,56 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
-    pub fn write_wrapped_expr(&mut self, expr: &Expression) -> Res {
+    pub fn write_wrapped_expr(&mut self, expr: &Expr) -> Res {
         self.write("(")?;
         self.write_expr(expr)?;
         self.write(")")?;
         Ok(())
     }
 
-    pub fn write_expr(&mut self, expr: &Expression) -> Res {
+    pub fn write_expr(&mut self, expr: &Expr) -> Res {
         trace!("write_expr");
         let cached_state = self.at_top_level;
         match expr {
-            Expression::Literal(ref expr) => self.write_literal(expr)?,
-            Expression::ThisExpression => self.write_this_expr()?,
-            Expression::SuperExpression => self.write_super_expr()?,
-            Expression::Array(ref expr) => self.write_array_expr(expr)?,
-            Expression::Object(ref expr) => self.write_object_expr(expr)?,
-            Expression::Function(ref expr) => {
+            Expr::Literal(ref expr) => self.write_literal(expr)?,
+            Expr::This => self.write_this_expr()?,
+            Expr::Super => self.write_super_expr()?,
+            Expr::Array(ref expr) => self.write_array_expr(expr)?,
+            Expr::Object(ref expr) => self.write_object_expr(expr)?,
+            Expr::Function(ref expr) => {
                 self.at_top_level = false;
                 self.write_function(expr)?;
                 self.at_top_level = cached_state;
             }
-            Expression::Unary(ref expr) => self.write_unary_expr(expr)?,
-            Expression::Update(ref expr) => self.write_update_expr(expr)?,
-            Expression::Binary(ref expr) => self.write_binary_expr(expr)?,
-            Expression::Assignment(ref expr) => {
+            Expr::Unary(ref expr) => self.write_unary_expr(expr)?,
+            Expr::Update(ref expr) => self.write_update_expr(expr)?,
+            Expr::Binary(ref expr) => self.write_binary_expr(expr)?,
+            Expr::Assignment(ref expr) => {
                 self.at_top_level = false;
                 self.write_assignment_expr(expr)?
             },
-            Expression::Logical(ref expr) => self.write_logical_expr(expr)?,
-            Expression::Member(ref expr) => self.write_member_expr(expr)?,
-            Expression::Conditional(ref expr) => self.write_conditional_expr(expr)?,
-            Expression::Call(ref expr) => self.write_call_expr(expr)?,
-            Expression::New(ref expr) => self.write_new_expr(expr)?,
-            Expression::Sequence(ref expr) => self.write_sequence_expr(expr)?,
-            Expression::Spread(ref expr) => self.write_spread_expr(expr)?,
-            Expression::ArrowFunction(ref expr) => {
+            Expr::Logical(ref expr) => self.write_logical_expr(expr)?,
+            Expr::Member(ref expr) => self.write_member_expr(expr)?,
+            Expr::Conditional(ref expr) => self.write_conditional_expr(expr)?,
+            Expr::Call(ref expr) => self.write_call_expr(expr)?,
+            Expr::New(ref expr) => self.write_new_expr(expr)?,
+            Expr::Sequence(ref expr) => self.write_sequence_expr(expr)?,
+            Expr::Spread(ref expr) => self.write_spread_expr(expr)?,
+            Expr::ArrowFunction(ref expr) => {
                 self.at_top_level = false;
                 self.write_arrow_function_expr(expr)?;
                 self.at_top_level = cached_state;
             }
-            Expression::Yield(ref expr) => self.write_yield_expr(expr)?,
-            Expression::Class(ref expr) => {
+            Expr::Yield(ref expr) => self.write_yield_expr(expr)?,
+            Expr::Class(ref expr) => {
                 self.at_top_level = false;
                 self.write_class(expr)?;
                 self.at_top_level = cached_state;
             }
-            Expression::MetaProperty(ref expr) => self.write_meta_property(expr)?,
-            Expression::Await(ref expr) => self.write_await_expr(expr)?,
-            Expression::Ident(ref expr) => self.write_ident(expr)?,
-            Expression::TaggedTemplate(ref expr) => self.write_tagged_template(expr)?,
+            Expr::MetaProperty(ref expr) => self.write_meta_property(expr)?,
+            Expr::Await(ref expr) => self.write_await_expr(expr)?,
+            Expr::Ident(ref expr) => self.write_ident(expr)?,
+            Expr::TaggedTemplate(ref expr) => self.write_tagged_template(expr)?,
             _ => unreachable!(),
         }
         Ok(())
@@ -1293,7 +1293,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// [one,,two,,3, null];
     /// ```
-    pub fn write_array_expr(&mut self, arr: &ArrayExpression) -> Res {
+    pub fn write_array_expr(&mut self, arr: &ArrayExpr) -> Res {
         trace!("write_array_expr");
         if arr.len() == 0 {
             self.write("[]")?;
@@ -1321,7 +1321,7 @@ impl<T: Write> Writer<T> {
     ///     c: d,
     /// }
     /// ```
-    pub fn write_object_expr(&mut self, obj: &ObjectExpression) -> Res {
+    pub fn write_object_expr(&mut self, obj: &ObjectExpr) -> Res {
         trace!("write_object_expr");
         if obj.len() == 0 {
             self.write("{}")?;
@@ -1344,7 +1344,7 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
     /// Write a function. This is used to write the contents of both a `Declaration::Function`
-    /// and an `Expression::Function`
+    /// and an `Expr::Function`
     pub fn write_function(&mut self, func: &Function) -> Res {
         trace!("write_function");
         if func.is_async {
@@ -1374,20 +1374,20 @@ impl<T: Write> Writer<T> {
     /// ~3
     /// !true
     /// ```
-    pub fn write_unary_expr(&mut self, unary: &UnaryExpression) -> Res {
+    pub fn write_unary_expr(&mut self, unary: &UnaryExpr) -> Res {
         trace!("write_unary_expr");
         if unary.prefix {
             self.write_unary_operator(&unary.operator)?;
         }
         match &*unary.argument {
-            Expression::Assignment(_) 
-            | Expression::Binary(_) 
-            | Expression::Logical(_)
-            | Expression::Conditional(_) 
-            | Expression::ArrowFunction(_) 
-            | Expression::Function(_) => self.write_wrapped_expr(&unary.argument)?,
-            Expression::Unary(_) 
-            | Expression::Update(_) => {
+            Expr::Assignment(_) 
+            | Expr::Binary(_) 
+            | Expr::Logical(_)
+            | Expr::Conditional(_) 
+            | Expr::ArrowFunction(_) 
+            | Expr::Function(_) => self.write_wrapped_expr(&unary.argument)?,
+            Expr::Unary(_) 
+            | Expr::Update(_) => {
                 self.write(" ")?;
                 self.write_expr(&unary.argument)?;
             },
@@ -1417,7 +1417,7 @@ impl<T: Write> Writer<T> {
     /// a++
     /// --b
     /// ```
-    pub fn write_update_expr(&mut self, update: &UpdateExpression) -> Res {
+    pub fn write_update_expr(&mut self, update: &UpdateExpr) -> Res {
         trace!("write_update_expr");
         if update.prefix {
             self.write_update_operator(&update.operator)?;
@@ -1444,7 +1444,7 @@ impl<T: Write> Writer<T> {
     /// x instanceof y
     /// x * 100
     /// ```
-    pub fn write_binary_expr(&mut self, binary: &BinaryExpression) -> Res {
+    pub fn write_binary_expr(&mut self, binary: &BinaryExpr) -> Res {
         trace!("write_binary_expr {:#?}", binary);
         let wrap = self.in_for_init && binary.operator == BinaryOperator::In;
         if wrap {
@@ -1461,13 +1461,13 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
-    pub fn write_binary_side(&mut self, side: &Expression) -> Res {
+    pub fn write_binary_side(&mut self, side: &Expr) -> Res {
         match &*side {
-            Expression::Assignment(_)
-            | Expression::Conditional(_)
-            | Expression::Logical(_) 
-            | Expression::Function(_)
-            | Expression::ArrowFunction(_) => self.write_wrapped_expr(side),
+            Expr::Assignment(_)
+            | Expr::Conditional(_)
+            | Expr::Logical(_) 
+            | Expr::Function(_)
+            | Expr::ArrowFunction(_) => self.write_wrapped_expr(side),
             _ => self.write_expr(side),
         }
     }
@@ -1506,17 +1506,17 @@ impl<T: Write> Writer<T> {
     /// b += 8
     /// q **= 100
     /// ```
-    pub fn write_assignment_expr(&mut self, assignment: &AssignmentExpression) -> Res {
+    pub fn write_assignment_expr(&mut self, assignment: &AssignmentExpr) -> Res {
         trace!("write_assignment_expr");
         let wrap_self = match &assignment.left {
             AssignmentLeft::Expr(ref e) => match &**e {
-                Expression::Object(_) 
-                | Expression::Array(_) => true,
+                Expr::Object(_) 
+                | Expr::Array(_) => true,
                 _ => false,
             }, 
-            AssignmentLeft::Pattern(ref p) => match p {
-                Pattern::Array(_) => true,
-                Pattern::Object(_) => true,
+            AssignmentLeft::Pat(ref p) => match p {
+                Pat::Array(_) => true,
+                Pat::Object(_) => true,
                 _ => false,
             }
         };
@@ -1525,7 +1525,7 @@ impl<T: Write> Writer<T> {
         }
         match &assignment.left {
             AssignmentLeft::Expr(ref e) => self.write_expr(e)?,
-            AssignmentLeft::Pattern(ref p) => self.write_pattern(p)?,
+            AssignmentLeft::Pat(ref p) => self.write_pattern(p)?,
         }
         self.write(" ")?;
         self.write_assignment_operator(&assignment.operator)?;
@@ -1561,12 +1561,12 @@ impl<T: Write> Writer<T> {
     /// a && b
     /// y || q
     /// ```
-    pub fn write_logical_expr(&mut self, logical: &LogicalExpression) -> Res {
+    pub fn write_logical_expr(&mut self, logical: &LogicalExpr) -> Res {
         trace!("write_logical_expr {:#?}", logical);
         let wrap_left = match &*logical.left {
-            Expression::Logical(ref l) => l.operator == LogicalOperator::Or,
-            Expression::Assignment(_)
-            | Expression::Conditional(_) => true,
+            Expr::Logical(ref l) => l.operator == LogicalOperator::Or,
+            Expr::Assignment(_)
+            | Expr::Conditional(_) => true,
             _ => false,
         };
         if wrap_left {
@@ -1577,9 +1577,9 @@ impl<T: Write> Writer<T> {
         self.write(" ")?;
         self.write_logical_operator(&logical.operator)?;
         let wrap_right = match &*logical.right {
-            Expression::Logical(ref _l) => true,
-            Expression::Assignment(_)
-            | Expression::Conditional(_) => true,
+            Expr::Logical(ref _l) => true,
+            Expr::Assignment(_)
+            | Expr::Conditional(_) => true,
             _ => false,
         };
         self.write(" ")?;
@@ -1605,19 +1605,19 @@ impl<T: Write> Writer<T> {
     /// console.log
     /// console['log']
     /// ```
-    pub fn write_member_expr(&mut self, member: &MemberExpression) -> Res {
+    pub fn write_member_expr(&mut self, member: &MemberExpr) -> Res {
         trace!("write_member_expr");
         match &*member.object {
-            Expression::Assignment(_) 
-            | Expression::Literal(Literal::Number(_))
-            | Expression::Conditional(_)
-            | Expression::Logical(_) 
-            | Expression::Function(_)
-            | Expression::ArrowFunction(_)
-            | Expression::Object(_)
-            | Expression::Binary(_) 
-            | Expression::Unary(_)
-            | Expression::Update(_) => self.write_wrapped_expr(&member.object)?,
+            Expr::Assignment(_) 
+            | Expr::Literal(Literal::Number(_))
+            | Expr::Conditional(_)
+            | Expr::Logical(_) 
+            | Expr::Function(_)
+            | Expr::ArrowFunction(_)
+            | Expr::Object(_)
+            | Expr::Binary(_) 
+            | Expr::Unary(_)
+            | Expr::Update(_) => self.write_wrapped_expr(&member.object)?,
             _ => self.write_expr(&member.object)?,
         }
         if member.computed {
@@ -1635,11 +1635,11 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// let x = isTrue ? 'yes' : 'no';
     /// ```
-    pub fn write_conditional_expr(&mut self, conditional: &ConditionalExpression) -> Res {
+    pub fn write_conditional_expr(&mut self, conditional: &ConditionalExpr) -> Res {
         trace!("write_conditional_expr");
         self.write_expr(&conditional.test)?;
         self.write(" ? ")?;
-        if let Expression::Logical(_) = &*conditional.consequent {
+        if let Expr::Logical(_) = &*conditional.consequent {
             self.write_wrapped_expr(&conditional.consequent)?;
         } else {
             self.write_expr(&conditional.consequent)?;
@@ -1654,11 +1654,11 @@ impl<T: Write> Writer<T> {
     /// (function() {
     /// })()
     /// ```
-    pub fn write_call_expr(&mut self, call: &CallExpression) -> Res {
+    pub fn write_call_expr(&mut self, call: &CallExpr) -> Res {
         trace!("write_call_expr");
         match &*call.callee {
-            Expression::Function(_) 
-            | Expression::ArrowFunction(_) => self.write_wrapped_expr(&call.callee)?,
+            Expr::Function(_) 
+            | Expr::ArrowFunction(_) => self.write_wrapped_expr(&call.callee)?,
             _ => self.write_expr(&call.callee)?,
         }
         self.write_sequence_expr(&call.arguments)?;
@@ -1668,12 +1668,12 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// new Uint8Array(100);
     /// ```
-    pub fn write_new_expr(&mut self, new: &NewExpression) -> Res {
+    pub fn write_new_expr(&mut self, new: &NewExpr) -> Res {
         trace!("write_new_expr");
         self.write("new ")?;
         match &*new.callee {
-            Expression::Assignment(_) 
-            | Expression::Call(_) => self.write_wrapped_expr(&new.callee)?,
+            Expr::Assignment(_) 
+            | Expr::Call(_) => self.write_wrapped_expr(&new.callee)?,
             _ => self.write_expr(&new.callee)?,
         }
         self.write_sequence_expr(&new.arguments)?;
@@ -1683,7 +1683,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// a = b, c = d, q * 100
     /// ```
-    pub fn write_sequence_expr(&mut self, sequence: &[Expression]) -> Res {
+    pub fn write_sequence_expr(&mut self, sequence: &[Expr]) -> Res {
         trace!("write_sequence_expr");
         let mut after_first = false;
         self.write("(")?;
@@ -1702,7 +1702,7 @@ impl<T: Write> Writer<T> {
     /// function(...args) {
     /// }
     /// ```
-    pub fn write_spread_expr(&mut self, spread: &Expression) -> Res {
+    pub fn write_spread_expr(&mut self, spread: &Expr) -> Res {
         trace!("write_spread_expr");
         self.write("...")?;
         self.write_expr(spread)?;
@@ -1715,7 +1715,7 @@ impl<T: Write> Writer<T> {
     ///     return x * y;
     /// }
     /// ```
-    pub fn write_arrow_function_expr(&mut self, func: &ArrowFunctionExpression) -> Res {
+    pub fn write_arrow_function_expr(&mut self, func: &ArrowFunctionExpr) -> Res {
         trace!("write_arrow_function_expr");
         if func.is_async {
             self.write("async ")?;
@@ -1723,11 +1723,11 @@ impl<T: Write> Writer<T> {
         if func.params.len() == 1 {
             match &func.params[0] {
                 FunctionArg::Expr(ref arg) => match arg {
-                    Expression::Ident(_)=> self.write_function_arg(&func.params[0])?,
+                    Expr::Ident(_)=> self.write_function_arg(&func.params[0])?,
                     _ => self.write_function_args(&func.params)?,
                 },
-                FunctionArg::Pattern(ref arg) => match arg {
-                    Pattern::Identifier(_) => self.write_function_arg(&func.params[0])?,
+                FunctionArg::Pat(ref arg) => match arg {
+                    Pat::Identifier(_) => self.write_function_arg(&func.params[0])?,
                     _ => self.write_function_args(&func.params)?,
                 }
             }
@@ -1739,8 +1739,8 @@ impl<T: Write> Writer<T> {
             ArrowFunctionBody::FunctionBody(ref b) => self.write_function_body(b)?,
             ArrowFunctionBody::Expr(ref e) => {
                 match &**e {
-                    Expression::Object(_) 
-                    | Expression::Binary(_) => self.write_wrapped_expr(e)?,
+                    Expr::Object(_) 
+                    | Expr::Binary(_) => self.write_wrapped_expr(e)?,
                     _ => self.write_expr(e)?,
                 }
             }
@@ -1755,7 +1755,7 @@ impl<T: Write> Writer<T> {
     ///     }
     /// }
     /// ```
-    pub fn write_yield_expr(&mut self, expr: &YieldExpression) -> Res {
+    pub fn write_yield_expr(&mut self, expr: &YieldExpr) -> Res {
         trace!("write_yield_expr");
         self.write("yield")?;
         if expr.argument.is_some() {
@@ -1787,7 +1787,7 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
     /// Write an expression preceded by the await keyword
-    pub fn write_await_expr(&mut self, expr: &Expression) -> Res {
+    pub fn write_await_expr(&mut self, expr: &Expr) -> Res {
         trace!("write_await_expr");
         self.write("await ")?;
         self.write_expr(expr)?;
@@ -1802,7 +1802,7 @@ impl<T: Write> Writer<T> {
     /// ```js
     /// tag`things ${0} stuff`;
     /// ```
-    pub fn write_tagged_template(&mut self, template: &TaggedTemplateExpression) -> Res {
+    pub fn write_tagged_template(&mut self, template: &TaggedTemplateExpr) -> Res {
         trace!("write_tagged_template");
         self.write_expr(&template.tag)?;
         self.write_template(&template.quasi)?;
@@ -1959,7 +1959,7 @@ mod test {
             &VariableKind::Var,
             &[VariableDecl::with_value(
                 "thing",
-                Expression::boolean(false),
+                Expr::boolean(false),
             )],
         )
         .unwrap();
@@ -1972,7 +1972,7 @@ mod test {
             &[
                 VariableDecl::uninitialized("stuff"),
                 VariableDecl::uninitialized("places"),
-                VariableDecl::with_value("thing", Expression::boolean(false)),
+                VariableDecl::with_value("thing", Expr::boolean(false)),
             ],
         )
         .unwrap();
