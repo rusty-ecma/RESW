@@ -1,1 +1,5 @@
-var callbackId = '_' + (callbacks.$$counter++).toString(36);
+
+
+function big_one() {
+    return 1n;
+}
