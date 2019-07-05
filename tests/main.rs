@@ -9,7 +9,7 @@ extern crate tar;
 extern crate rayon;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
-
+use resast::ref_tree::AsConcrete;
 use ressa::Builder;
 use resw::{
     Writer,
@@ -109,7 +109,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 break;
             },
         };
-        first_writer.write_part(&part).expect("Failed to write part");
+        first_writer.write_part(&part.as_concrete()).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
     let mut b = Builder::new();
@@ -129,7 +129,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 return (first_pass, second_pass)
             },
         };
-        second_writer.write_part(&part).expect("failed to write part");
+        second_writer.write_part(&part.as_concrete()).expect("failed to write part");
     }
     let second_pass = second_write.get_string().expect("Invalid utf-8 written to second write");
     (first_pass, Some(second_pass))

@@ -1,9 +1,8 @@
 #[macro_use]
 extern crate log;
-use resast::ref_tree::prelude::*;
-use resast::decl::{
-    VariableKind,
-};
+use resast::prelude::*;
+use resast::decl::VariableKind;
+
 use std::io::{Error as IoError, Write};
 use ress::{
     prelude::Comment,
@@ -128,6 +127,13 @@ impl<T: Write> Writer<T> {
     }
     /// This will loop over the contents of a `Program` and
     /// attempt write them all to the provided `impl Write`
+    /// 
+    /// > Note: This will take the concrete version of the `resast` tree
+    /// > to allow for easier mutation of any string contents
+    /// > by enabling the use of `format!`. If using this in
+    /// > conjunction with `ressa` you will need to call the `AsConcrete`
+    /// > trait method `as_concrete` to convert the output into
+    /// > the right type for input here. 
     pub fn write_program(&mut self, program: &Program) -> Res {
         let parts = match program {
             Program::Script(ref parts) => parts,
@@ -994,6 +1000,9 @@ impl<T: Write> Writer<T> {
     /// Write an object or class property
     pub fn write_property(&mut self, prop: &Property) -> Res {
         trace!("write_property");
+        if prop.is_static {
+            self.write("static ")?;
+        }
         match &prop.kind {
             PropertyKind::Init => self.write_init_property(prop),
             PropertyKind::Get => self.write_get_property(prop),
@@ -1963,7 +1972,7 @@ mod test {
         w.write_variable_decls(
             &VariableKind::Var,
             &[VariableDecl {
-                id: Pat::Identifier("thing"),
+                id: Pat::Identifier("thing".to_string()),
                 init: Some(Expr::Literal(Literal::Boolean(false)))
             }],
         )
@@ -1976,15 +1985,15 @@ mod test {
             &VariableKind::Let,
             &[
                 VariableDecl {
-                    id: Pat::Identifier("stuff"),
+                    id: Pat::Identifier("stuff".to_string()),
                     init: None,
                 },
                 VariableDecl {
-                    id: Pat::Identifier("places"),
+                    id: Pat::Identifier("places".to_string()),
                     init: None,
                 },
                 VariableDecl {
-                    id: Pat::Identifier("thing"),
+                    id: Pat::Identifier("thing".to_string()),
                     init: Some(Expr::Literal(
                     Literal::Boolean(false))),
                 }

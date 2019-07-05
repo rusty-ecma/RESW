@@ -6,6 +6,7 @@ use resw::{
 use ressa::{Parser, Error};
 use flate2::read::GzDecoder;
 use std::path::Path;
+use resast::ref_tree::AsConcrete;
 
 
 #[test]
@@ -81,26 +82,6 @@ fn walk(path: &Path) -> Vec<String> {
 }
 
 fn run(file: &Path) -> Result<Option<String>, Error> {
-    // if file.ends_with("gc/bug-1459860.js")
-    // || file.ends_with("basic/testBug756918.js")
-    // || file.ends_with("basic/bug738841.js")
-    // || file.ends_with("ion/bug1331405.js")
-    // || file.ends_with("basic/testThatGenExpsActuallyDecompile.js")
-    // || file.ends_with("jaeger/bug672122.js")
-    // || file.ends_with("gc/bug-924690.js")
-    // || file.ends_with("auto-regress/bug732719.js")
-    // || file.ends_with("auto-regress/bug740509.js")
-    // || file.ends_with("auto-regress/bug521279.js")
-    // || file.ends_with("auto-regress/bug701248.js")
-    // || file.ends_with("auto-regress/bug1390082-1.js")
-    // || file.ends_with("auto-regress/bug680797.js")
-    // || file.ends_with("auto-regress/bug521163.js")
-    // || file.ends_with("auto-regress/bug1448582-5.js")
-    // || file.ends_with("tests/backup-point-bug1315634.js")
-    // || file.ends_with("auto-regress/bug650574.js")
-    // || file.ends_with("baseline/setcall.js") {
-    //     return Ok(None)
-    // }
     let contents = ::std::fs::read_to_string(file)?;
     if contents.starts_with("// |jit-test| error: SyntaxError")
         || contents.starts_with("|")
@@ -119,7 +100,7 @@ fn around_once(js: &str) -> Result<String, Error> {
     let mut writer = Writer::new(out.generate_child());
     for part in Parser::new(&js)? {
         let part = part?;
-        writer.write_part(&part).expect("Failed to write part");
+        writer.write_part(&part.as_concrete()).expect("Failed to write part");
     }
     Ok(out.get_string().expect("invalid utf8 written to write_string"))
 }
