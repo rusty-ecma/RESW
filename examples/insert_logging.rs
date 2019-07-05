@@ -2,6 +2,7 @@ use ressa::Parser;
 use resw::Writer;
 use resast::prelude::*;
 use std::fs::{read_to_string, File};
+use resast::ref_tree::AsConcrete;
 
 fn main() {
     pretty_env_logger::init();
@@ -14,7 +15,7 @@ fn main() {
     let p = Parser::new(&js).expect("Failed to create parser");
     let f = File::create("./examples/inserted.js").expect("failed to create file");
     let mut w = Writer::new(f);
-    for ref part in p.map(|r| r.unwrap()).map(map_part) {
+    for ref part in p.map(|r| r.unwrap().as_concrete()).map(map_part) {
         w.write_part(part).expect("failed to write part");
     }
 }
@@ -92,7 +93,7 @@ fn map_class(class: &Class) -> Class {
 fn map_class_prop(prefix: &str, prop: &Property) -> Property {
     let mut prop = prop.clone();
     let mut args = match prop.kind {
-        PropertyKind::Ctor => vec![Expr::string(&format!("'new {}'", prefix))],
+        PropertyKind::Ctor => vec![Expr::Literal(Literal::String(format!("'new {}'", prefix)))],
         PropertyKind::Get => vec![
             Expr::string(&format!("'{}'", prefix)),
             Expr::string("get"),

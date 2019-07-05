@@ -9,7 +9,7 @@ extern crate tar;
 extern crate rayon;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
-
+use resast::ref_tree::AsConcrete;
 use ressa::Builder;
 use resw::{
     Writer,
@@ -98,7 +98,8 @@ fn moment() {
 fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
     let mut second_write = WriteString::new();
-    let first_parser = Builder::new().module(module).js(js).build().expect("Failed to create parser");
+    let mut b = Builder::new();
+    let first_parser = b.module(module).js(js).build().expect("Failed to create parser");
     let mut first_writer = Writer::new(first_write.generate_child());
     for part in first_parser {
         let part = match part {
@@ -108,10 +109,11 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 break;
             },
         };
-        first_writer.write_part(&part).expect("Failed to write part");
+        first_writer.write_part(&part.as_concrete()).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
-    let second_parser = Builder::new().module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
+    let mut b = Builder::new();
+    let second_parser = b.module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
     let mut second_writer = Writer::new(second_write.generate_child());
     for part in second_parser {
         let part = match part {
@@ -127,7 +129,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 return (first_pass, second_pass)
             },
         };
-        second_writer.write_part(&part).expect("failed to write part");
+        second_writer.write_part(&part.as_concrete()).expect("failed to write part");
     }
     let second_pass = second_write.get_string().expect("Invalid utf-8 written to second write");
     (first_pass, Some(second_pass))

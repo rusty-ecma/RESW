@@ -1,9 +1,13 @@
 #[macro_use]
 extern crate log;
-use ress::{Comment, CommentKind};
 use resast::prelude::*;
-use std::io::{Error as IoError, Write};
+use resast::decl::VariableKind;
 
+use std::io::{Error as IoError, Write};
+use ress::{
+    prelude::Comment,
+    tokens::CommentKind,
+};
 mod rewrite;
 pub mod write_str;
 
@@ -123,6 +127,13 @@ impl<T: Write> Writer<T> {
     }
     /// This will loop over the contents of a `Program` and
     /// attempt write them all to the provided `impl Write`
+    /// 
+    /// > Note: This will take the concrete version of the `resast` tree
+    /// > to allow for easier mutation of any string contents
+    /// > by enabling the use of `format!`. If using this in
+    /// > conjunction with `ressa` you will need to call the `AsConcrete`
+    /// > trait method `as_concrete` to convert the output into
+    /// > the right type for input here. 
     pub fn write_program(&mut self, program: &Program) -> Res {
         let parts = match program {
             Program::Script(ref parts) => parts,
@@ -989,6 +1000,9 @@ impl<T: Write> Writer<T> {
     /// Write an object or class property
     pub fn write_property(&mut self, prop: &Property) -> Res {
         trace!("write_property");
+        if prop.is_static {
+            self.write("static ")?;
+        }
         match &prop.kind {
             PropertyKind::Init => self.write_init_property(prop),
             PropertyKind::Get => self.write_get_property(prop),
@@ -1859,7 +1873,7 @@ impl<T: Write> Writer<T> {
     }
 
     pub fn write_regex(&mut self, regex: &RegEx) -> Res {
-        trace!("write_regex");
+        trace!("write_regex {:?}", regex);
         self.write("/")?;
         self.write(&regex.pattern)?;
         self.write("/")?;
@@ -1916,14 +1930,14 @@ impl<T: Write> Writer<T> {
         let _ = self.out.write(s.as_bytes())?;
         Ok(())
     }
-    pub fn write_comment(&mut self, comment: Comment) -> Res {
+    pub fn write_comment(&mut self, comment: Comment<&str>) -> Res {
         match comment.kind {
             CommentKind::Single => self.write(&format!("//{}", comment.content))?,
             CommentKind::Multi => self.write(&format!("/*{}\n*/", comment.content))?,
             CommentKind::Html => self.write(&format!(
                 "<!--{}-->{}",
                 comment.content,
-                comment.tail_content.unwrap_or(String::new())
+                comment.tail_content.unwrap_or("")
             ))?,
         }
         Ok(())
@@ -1957,10 +1971,10 @@ mod test {
         let mut w = Writer::new(f.generate_child());
         w.write_variable_decls(
             &VariableKind::Var,
-            &[VariableDecl::with_value(
-                "thing",
-                Expr::boolean(false),
-            )],
+            &[VariableDecl {
+                id: Pat::Identifier("thing".to_string()),
+                init: Some(Expr::Literal(Literal::Boolean(false)))
+            }],
         )
         .unwrap();
         let s = f.get_string_lossy();
@@ -1970,9 +1984,19 @@ mod test {
         w.write_variable_decls(
             &VariableKind::Let,
             &[
-                VariableDecl::uninitialized("stuff"),
-                VariableDecl::uninitialized("places"),
-                VariableDecl::with_value("thing", Expr::boolean(false)),
+                VariableDecl {
+                    id: Pat::Identifier("stuff".to_string()),
+                    init: None,
+                },
+                VariableDecl {
+                    id: Pat::Identifier("places".to_string()),
+                    init: None,
+                },
+                VariableDecl {
+                    id: Pat::Identifier("thing".to_string()),
+                    init: Some(Expr::Literal(
+                    Literal::Boolean(false))),
+                }
             ],
         )
         .unwrap();

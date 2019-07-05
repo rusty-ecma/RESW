@@ -6,10 +6,8 @@ use resw::{
 use ressa::{Parser, Error};
 use flate2::read::GzDecoder;
 use std::path::Path;
-use rayon::prelude::*;
+use resast::ref_tree::AsConcrete;
 
-static mut COUNT: usize = 0;
-static mut FAILURES: usize = 0;
 
 #[test]
 fn moz_central() {
@@ -17,39 +15,38 @@ fn moz_central() {
     if !moz_central_path.exists() {
         get_moz_central_test_files(&moz_central_path);
     }
-    walk(&moz_central_path);
-    unsafe {
-        if FAILURES > 0 {
-            panic!("Some spider_monkey tests failed to parse");
+    let msgs = walk(&moz_central_path);
+    if !msgs.is_empty() {
+        for msg in msgs {
+            eprintln!("{}", msg);
         }
+        panic!()
     }
 }
 
-fn walk(path: &Path) {
+fn walk(path: &Path) -> Vec<String> {
+    let mut ret = vec![];
     let files = path.read_dir().unwrap()
         .map(|e| e.unwrap().path())
         .collect::<Vec<_>>();
-
-    files.par_iter()
-        .for_each(|path| {
-            unsafe {
-                if COUNT > 0 && COUNT % 100 == 0 {
-                    println!("Status Update {}/{}", FAILURES, COUNT);
-                }
-            }
-            if path.is_file() {
+    for path in files {
+        if path.is_file() {
                 if let Some(ext) = path.extension() {
                     if ext == "js" {
-                        match run(path) {
+                        match run(&path) {
                             Ok(js) => {
                                 if let Some(first) = js {
                                     match around_once(&first) {
                                         Ok(second) => {
-                                            check_round_trips(&path, &first, &Some(second));
+                                            if let Some(msg) = check_round_trips(&path, &first, &Some(second)) {
+                                                ret.push(msg);
+                                            }
                                         },
                                         Err(e) => {
-                                            eprintln!("{}", e);
-                                            check_round_trips(&path, &first, &None);
+                                            ret.push(format!("{}", e));
+                                            if let Some(msg) = check_round_trips(&path, &first, &None) {
+                                                ret.push(msg)
+                                            }
                                         }
                                     }
                                 }
@@ -65,46 +62,26 @@ fn walk(path: &Path) {
                                     | Error::UnexpectedToken(ref pos, _) => format!("{}:{}:{}", path.display(), pos.line, pos.column),
                                     _ => format!("{}", path.display()),
                                 };
-                                eprintln!("Parse Failure {}\n\t{}", e, loc);
                                 if let Ok(op) = ::std::process::Command::new("./node_modules/.bin/esparse").arg(path).output() {
-                                    if !op.status.success() {
-                                        eprintln!("possible new whitelist item:\n\t{}", path.display());
+                                    if op.status.success() {
+                                        // eprintln!("possible new whitelist item:\n\t{}", path.display());
+                                        ret.push(format!("1st pass failure parsed by esprima: {}\n\t{}", e, loc));
                                     }
                                 }
-                                unsafe { FAILURES += 1 }
                             }
                         }
                     }
                 }
             } else {
-                walk(&path)
+                ret.extend(
+                    walk(&path)
+                )
             }
-        });
-
+    }
+    ret
 }
 
 fn run(file: &Path) -> Result<Option<String>, Error> {
-    unsafe { COUNT += 1 }
-    if file.ends_with("gc/bug-1459860.js")
-    || file.ends_with("basic/testBug756918.js")
-    || file.ends_with("basic/bug738841.js")
-    || file.ends_with("ion/bug1331405.js")
-    || file.ends_with("basic/testThatGenExpsActuallyDecompile.js")
-    || file.ends_with("jaeger/bug672122.js")
-    || file.ends_with("gc/bug-924690.js")
-    || file.ends_with("auto-regress/bug732719.js")
-    || file.ends_with("auto-regress/bug740509.js")
-    || file.ends_with("auto-regress/bug521279.js")
-    || file.ends_with("auto-regress/bug701248.js")
-    || file.ends_with("auto-regress/bug1390082-1.js")
-    || file.ends_with("auto-regress/bug680797.js")
-    || file.ends_with("auto-regress/bug521163.js")
-    || file.ends_with("auto-regress/bug1448582-5.js")
-    || file.ends_with("tests/backup-point-bug1315634.js")
-    || file.ends_with("auto-regress/bug650574.js")
-    || file.ends_with("baseline/setcall.js") {
-        return Ok(None)
-    }
     let contents = ::std::fs::read_to_string(file)?;
     if contents.starts_with("// |jit-test| error: SyntaxError")
         || contents.starts_with("|")
@@ -123,7 +100,7 @@ fn around_once(js: &str) -> Result<String, Error> {
     let mut writer = Writer::new(out.generate_child());
     for part in Parser::new(&js)? {
         let part = part?;
-        writer.write_part(&part).expect("Failed to write part");
+        writer.write_part(&part.as_concrete()).expect("Failed to write part");
     }
     Ok(out.get_string().expect("invalid utf8 written to write_string"))
 }
@@ -138,19 +115,18 @@ fn get_moz_central_test_files(path: &Path) {
     let mut t = tar::Archive::new(gz);
     t.unpack(path).expect("Failed to unpack gz");
 }
-fn check_round_trips(path: &Path, first: &str, second: &Option<String>) {
+fn check_round_trips(path: &Path, first: &str, second: &Option<String>) -> Option<String> {
     let name = path.file_name().unwrap().to_str().unwrap();
     if let Some(ref js) = second {
         if first != js {
             write_failure(name, first, second);
-            eprintln!("Double round trip failed for {0}\ncheck ./{1}.first.js and ./{1}.second.js", path.display(), name);
-            unsafe { FAILURES += 1}
+            return Some(format!("Double round trip failed for {0}\ncheck ./{1}.first.js and ./{1}.second.js", path.display(), name));
         }
     } else {
         write_failure(name, first, second);
-        eprintln!("Double round trip failed to parse second pass for {}\n chec ./{}.first.js", path.display(), name);
-        unsafe { FAILURES += 1}
+        return Some(format!("Double round trip failed to parse second pass for {}\n chec ./{}.first.js", path.display(), name));
     }
+    None
 }
 fn write_failure(name: &str, first: &str, second: &Option<String>) {
     use std::io::Write;
