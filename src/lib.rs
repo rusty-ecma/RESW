@@ -1,9 +1,14 @@
 #[macro_use]
 extern crate log;
-use ress::{Comment, CommentKind};
-use resast::prelude::*;
+use resast::ref_tree::prelude::*;
+use resast::decl::{
+    VariableKind,
+};
 use std::io::{Error as IoError, Write};
-
+use ress::{
+    prelude::Comment,
+    tokens::CommentKind,
+};
 mod rewrite;
 pub mod write_str;
 
@@ -1859,7 +1864,7 @@ impl<T: Write> Writer<T> {
     }
 
     pub fn write_regex(&mut self, regex: &RegEx) -> Res {
-        trace!("write_regex");
+        trace!("write_regex {:?}", regex);
         self.write("/")?;
         self.write(&regex.pattern)?;
         self.write("/")?;
@@ -1916,14 +1921,14 @@ impl<T: Write> Writer<T> {
         let _ = self.out.write(s.as_bytes())?;
         Ok(())
     }
-    pub fn write_comment(&mut self, comment: Comment) -> Res {
+    pub fn write_comment(&mut self, comment: Comment<&str>) -> Res {
         match comment.kind {
             CommentKind::Single => self.write(&format!("//{}", comment.content))?,
             CommentKind::Multi => self.write(&format!("/*{}\n*/", comment.content))?,
             CommentKind::Html => self.write(&format!(
                 "<!--{}-->{}",
                 comment.content,
-                comment.tail_content.unwrap_or(String::new())
+                comment.tail_content.unwrap_or("")
             ))?,
         }
         Ok(())
@@ -1957,10 +1962,10 @@ mod test {
         let mut w = Writer::new(f.generate_child());
         w.write_variable_decls(
             &VariableKind::Var,
-            &[VariableDecl::with_value(
-                "thing",
-                Expr::boolean(false),
-            )],
+            &[VariableDecl {
+                id: Pat::Identifier("thing"),
+                init: Some(Expr::Literal(Literal::Boolean(false)))
+            }],
         )
         .unwrap();
         let s = f.get_string_lossy();
@@ -1970,9 +1975,19 @@ mod test {
         w.write_variable_decls(
             &VariableKind::Let,
             &[
-                VariableDecl::uninitialized("stuff"),
-                VariableDecl::uninitialized("places"),
-                VariableDecl::with_value("thing", Expr::boolean(false)),
+                VariableDecl {
+                    id: Pat::Identifier("stuff"),
+                    init: None,
+                },
+                VariableDecl {
+                    id: Pat::Identifier("places"),
+                    init: None,
+                },
+                VariableDecl {
+                    id: Pat::Identifier("thing"),
+                    init: Some(Expr::Literal(
+                    Literal::Boolean(false))),
+                }
             ],
         )
         .unwrap();

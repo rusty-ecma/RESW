@@ -98,7 +98,8 @@ fn moment() {
 fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
     let mut second_write = WriteString::new();
-    let first_parser = Builder::new().module(module).js(js).build().expect("Failed to create parser");
+    let mut b = Builder::new();
+    let first_parser = b.module(module).js(js).build().expect("Failed to create parser");
     let mut first_writer = Writer::new(first_write.generate_child());
     for part in first_parser {
         let part = match part {
@@ -111,7 +112,8 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
         first_writer.write_part(&part).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
-    let second_parser = Builder::new().module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
+    let mut b = Builder::new();
+    let second_parser = b.module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
     let mut second_writer = Writer::new(second_write.generate_child());
     for part in second_parser {
         let part = match part {
