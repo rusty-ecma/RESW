@@ -1,8 +1,13 @@
 use ressa::Parser;
 use resw::Writer;
 use resast::prelude::*;
-use std::fs::{read_to_string, File};
-use resast::ref_tree::AsConcrete;
+use std::{
+    fs::{
+        read_to_string, 
+        File
+    },
+    io::BufWriter,
+};
 
 fn main() {
     pretty_env_logger::init();
@@ -14,151 +19,191 @@ fn main() {
     let js = read_to_string(file_name).expect("Unable to find js file");
     let p = Parser::new(&js).expect("Failed to create parser");
     let f = File::create("./examples/inserted.js").expect("failed to create file");
-    let mut w = Writer::new(f);
-    for ref part in p.map(|r| r.unwrap().as_concrete()).map(map_part) {
+    let mut w = Writer::new(BufWriter::new(f));
+    for ref part in p.map(|r| r.unwrap()).map(map_part) {
         w.write_part(part).expect("failed to write part");
     }
 }
 
-fn map_part(part: ProgramPart) -> ProgramPart {
+fn map_part<'a>(part: ProgramPart<'a>) -> ProgramPart<'a> {
     match part {
-        ProgramPart::Decl(ref decl) => ProgramPart::Decl(map_decl(decl)),
-        ProgramPart::Stmt(ref stmt) => ProgramPart::Stmt(map_stmt(stmt)),
+        ProgramPart::Decl(decl) => ProgramPart::Decl(map_decl(decl)),
+        ProgramPart::Stmt(stmt) => ProgramPart::Stmt(map_stmt(stmt)),
         ProgramPart::Dir(_) => part,
     }
 }
 
-fn map_decl(decl: &Decl) -> Decl {
+fn map_decl<'a>(decl: Decl<'a>) -> Decl<'a> {
     match decl {
-        Decl::Function(ref f) => Decl::Function(map_func(f)),
-        Decl::Class(ref class) => Decl::Class(map_class(class)),
+        Decl::Func(f) => Decl::Func(map_func(f)),
+        Decl::Class(class) => Decl::Class(map_class(class)),
         _ => decl.clone(),
     }
 }
 
-fn map_stmt(stmt: &Stmt) -> Stmt {
+fn map_stmt<'a>(stmt: Stmt<'a>) -> Stmt<'a> {
     match stmt {
-        Stmt::Expr(ref expr) => Stmt::Expr(map_expr(expr)),
+        Stmt::Expr(expr) => Stmt::Expr(map_expr(expr)),
         _ => stmt.clone(),
     }
 }
 
-fn map_expr(expr: &Expr) -> Expr {
+fn map_expr<'a>(expr: Expr<'a>) -> Expr<'a> {
     match expr {
-        Expr::Function(ref f) => Expr::Function(map_func(f)),
-        Expr::Class(ref c) => Expr::Class(map_class(c)),
+        Expr::Func(f) => Expr::Func(map_func(f)),
+        Expr::Class(c) => Expr::Class(map_class(c)),
         _ => expr.clone(),
     }
 }
 
-fn map_func(func: &Function) -> Function {
-    let mut f = func.clone();
+fn map_func<'a>(mut func: Func<'a>) -> Func<'a> {
     let mut args = vec![];
-    if let Some(ref name) = f.id {
-        args.push(Expr::string(&format!("'{}'", name)));
+    if let Some(ref name) = &func.id {
+        args.push(Expr::Lit(Lit::String(StringLit::Single(name.name.clone()))));
     }
-    for arg in f.params.iter().filter_map(|a| match a {
-        FunctionArg::Expr(e) => match e {
+    for arg in func.params.iter().filter_map(|a| match a {
+        FuncArg::Expr(e) => match e {
             Expr::Ident(i) => Some(i),
             _ => None,
         },
-        FunctionArg::Pat(p) => match p {
-            Pat::Identifier(i) => Some(i),
+        FuncArg::Pat(p) => match p {
+            Pat::Ident(i) => Some(i),
             _ => None,
         },
     }) {
-        args.push(Expr::ident(arg));
+        args.push(Expr::Ident(arg.clone()));
     }
-    f.body.insert(0, console_log(args));
-    f.body = f.body.into_iter().map(map_part).collect();
-    f
+    func.body.0.insert(0, console_log(args));
+    func.body = FuncBody(func.body.0.into_iter().map(map_part).collect());
+    func
 }
 
-fn map_class(class: &Class) -> Class {
-    let mut class = class.clone();
+fn map_class<'a>(mut class: Class<'a>) -> Class<'a> {
     let prefix = if let Some(ref id) = class.id {
-        id.clone()
+        Some(
+            Expr::Lit(
+                Lit::String(
+                    StringLit::Single(
+                        id.name.clone()
+                    )
+                )
+            )
+        )
     } else {
-        String::new()
+        None
     };
-
-    class.body = class
-        .body
-        .iter()
-        .map(|prop| map_class_prop(&prefix, prop))
-        .collect();
+    let mut new_body = vec![];
+    for item in class.body.0 {
+        new_body.push(map_class_prop(prefix.clone(), item))
+    }
+    class.body = ClassBody(new_body);
     class
 }
 
-fn map_class_prop(prefix: &str, prop: &Property) -> Property {
-    let mut prop = prop.clone();
+fn map_class_prop<'a>(prefix: Option<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
     let mut args = match prop.kind {
-        PropertyKind::Ctor => vec![Expr::Literal(Literal::String(format!("'new {}'", prefix)))],
-        PropertyKind::Get => vec![
-            Expr::string(&format!("'{}'", prefix)),
-            Expr::string("get"),
-        ],
-        PropertyKind::Set => vec![
-            Expr::string(&format!("'{}'", prefix)),
-            Expr::string("set"),
-        ],
-        PropertyKind::Method => vec![Expr::string(&format!("'{}'", prefix))],
+        PropKind::Ctor => {
+            let mut args = vec![
+                Expr::Lit(Lit::String(StringLit::single_from("new"))),
+            ];
+            if let Some(ref s) = prefix {
+                args.push(s.clone());
+            }
+            args
+        },
+        PropKind::Get => {
+            let mut args = vec![];
+            if let Some(ref s) = prefix {
+                args.push(s.clone());
+            }
+            args.push(
+                Expr::Lit(Lit::String(StringLit::single_from("get")))
+            );
+            args
+        },
+        PropKind::Set => {
+            let mut args = vec![];
+            if let Some(ref s) = prefix {
+                args.push(s.clone());
+            }
+            args.push(
+                Expr::Lit(Lit::String(StringLit::single_from("set")))
+            );
+            args
+        },
+        PropKind::Method => {
+            let mut args = vec![];
+            if let Some(ref s) = prefix {
+                args.push(s.clone());
+            }
+            args
+        },
         _ => vec![],
     };
     match &prop.key {
-        PropertyKey::Expr(ref expr) => match expr {
+        PropKey::Expr(ref expr) => match expr {
             Expr::Ident(ref i) => {
-                if i != "constructor" {
-                    args.push(Expr::string(&format!("'{}'", i)));
+                if i.name != "constructor" {
+                    args.push(Expr::Lit(Lit::String(StringLit::Single(i.name.clone()))));
                 }
             }
             _ => (),
         },
-        PropertyKey::Literal(ref l) => match l {
-            Literal::Boolean(ref b) => {
-                args.push(Expr::string(&format!("'{}'", b)));
+        PropKey::Lit(ref l) => match l {
+            Lit::Boolean(ref b) => {
+                args.push(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(format!("{}", b))))));
             }
-            Literal::Null => {
-                args.push(Expr::string("'null'"));
+            Lit::Null => {
+                args.push(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(String::from("null"))))));
             }
-            Literal::Number(ref n) => {
-                args.push(Expr::string(&format!("'{}'", n)));
+            Lit::Number(ref n) => {
+                args.push(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(format!("{}", n))))));
             }
-            Literal::RegEx(ref r) => {
-                args.push(Expr::string(&format!("'/{}/{}'", r.pattern, r.flags)));
+            Lit::RegEx(ref r) => {
+                let mut s = String::from("/");
+                s.push_str(&r.pattern);
+                s.push('/');
+                s.push_str(&r.flags);
+                let s = ::std::borrow::Cow::Owned(s);
+                args.push(Expr::Lit(Lit::String(StringLit::Single(s))));
             }
-            Literal::String(ref s) => {
-                if s != "constructor" {
-                    args.push(Expr::string(s));
+            Lit::String(ref s) => {
+                match s {
+                    StringLit::Double(inner)
+                    | StringLit::Single(inner) => {
+                        if inner != "constructor" {
+                            args.push(Expr::Lit(Lit::String(s.clone())))
+                        }
+                    }
                 }
             }
             _ => (),
         },
-        PropertyKey::Pat(ref p) => match p {
-            Pat::Identifier(ref i) => {
-                args.push(Expr::string(&format!("'{}'", i)));
+        PropKey::Pat(ref p) => match p {
+            Pat::Ident(ref i) => {
+                args.push(Expr::Lit(Lit::String(StringLit::Single(i.name.clone()))));
             }
             _ => (),
         },
     }
-    if let PropertyValue::Expr(ref mut expr) = prop.value {
+    if let PropValue::Expr(ref mut expr) = prop.value {
         match expr {
-            Expr::Function(ref mut f) => {
+            Expr::Func(ref mut f) => {
                 for ref arg in &f.params {
                     match arg {
-                        FunctionArg::Expr(ref expr) => match expr {
+                        FuncArg::Expr(ref expr) => match expr {
                             Expr::Ident(_) => args.push(expr.clone()),
                             _ => (),
                         },
-                        FunctionArg::Pat(ref pat) => match pat {
-                            Pat::Identifier(ref ident) => args.push(Expr::ident(ident)),
+                        FuncArg::Pat(ref pat) => match pat {
+                            Pat::Ident(ref ident) => args.push(Expr::Ident(ident.clone())),
                             _ => {}
                         },
                     }
                 }
                 insert_expr_into_func_body(console_log(args), f)
             }
-            Expr::ArrowFunction(ref mut arrow) => match &arrow.body {
+            Expr::ArrowFunc(ref mut arrow) => match &arrow.body {
                 _ => (),
             },
             _ => (),
@@ -167,17 +212,21 @@ fn map_class_prop(prefix: &str, prop: &Property) -> Property {
     prop
 }
 
-fn insert_expr_into_func_body(expr: ProgramPart, func: &mut Function) {
-    func.body.insert(0, expr);
+fn insert_expr_into_func_body<'a>(expr: ProgramPart<'a>, func: &mut Func<'a>) {
+    func.body.0.insert(0, expr);
 }
 
-pub fn console_log(args: Vec<Expr>) -> ProgramPart {
-    ProgramPart::Stmt(Stmt::Expr(Expr::call(
-        Expr::member(
-            Expr::ident("console"),
-            Expr::ident("log"),
-            false,
-        ),
-        args,
+pub fn console_log<'a>(args: Vec<Expr<'a>>) -> ProgramPart<'a> {
+    ProgramPart::Stmt(Stmt::Expr(Expr::Call(
+        CallExpr {
+            callee: Box::new(Expr::Member(
+                MemberExpr {
+                    computed: false,
+                    object: Box::new(Expr::ident_from("console")),
+                    property: Box::new(Expr::ident_from("log")),
+                }
+            )),
+            arguments: args,
+        }
     )))
 }
