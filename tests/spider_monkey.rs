@@ -6,7 +6,6 @@ use resw::{
 use ressa::{Parser, Error};
 use flate2::read::GzDecoder;
 use std::path::Path;
-use resast::ref_tree::AsConcrete;
 
 
 #[test]
@@ -100,7 +99,7 @@ fn around_once(js: &str) -> Result<String, Error> {
     let mut writer = Writer::new(out.generate_child());
     for part in Parser::new(&js)? {
         let part = part?;
-        writer.write_part(&part.as_concrete()).expect("Failed to write part");
+        writer.write_part(&part).expect("Failed to write part");
     }
     Ok(out.get_string().expect("invalid utf8 written to write_string"))
 }
