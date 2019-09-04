@@ -1,5 +1,7 @@
 function Thing() {
-
+    this.add = function(one, two) {
+        return one + two;
+    }
 }
 
 function add(one, two) {
@@ -15,6 +17,8 @@ class Stuff {
         return one + two;
     }
 }
+
+let x = (a) => a + 1;
 
 (function() {
     let t = Thing();
