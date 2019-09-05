@@ -20,33 +20,31 @@ fn main() {
     let p = Parser::new(&js).expect("Failed to create parser");
     let f = File::create("./examples/inserted.js").expect("failed to create file");
     let mut w = Writer::new(BufWriter::new(f));
-    for ref part in p.map(|r| r.unwrap()).map(map_part) {
+    for ref part in p.map(|r| r.unwrap()).map(|p| map_part(vec![], p)) {
         w.write_part(part).expect("failed to write part");
     }
 }
 
-fn map_part<'a>(part: ProgramPart<'a>) -> ProgramPart<'a> {
+fn map_part<'a>(args: Vec<Expr<'a>>, part: ProgramPart<'a>) -> ProgramPart<'a> {
     match part {
-        ProgramPart::Decl(decl) => ProgramPart::Decl(map_decl(decl)),
-        ProgramPart::Stmt(stmt) => ProgramPart::Stmt(map_stmt(stmt)),
+        ProgramPart::Decl(decl) => ProgramPart::Decl(map_decl(args, decl)),
+        ProgramPart::Stmt(stmt) => ProgramPart::Stmt(map_stmt(args, stmt)),
         ProgramPart::Dir(_) => part,
     }
 }
 
-fn map_decl<'a>(decl: Decl<'a>) -> Decl<'a> {
+fn map_decl<'a>(mut args: Vec<Expr<'a>>, decl: Decl<'a>) -> Decl<'a> {
     match decl {
-        Decl::Func(f) => Decl::Func(map_func(vec![], f)),
-        Decl::Class(class) => Decl::Class(map_class(vec![], class)),
+        Decl::Func(f) => Decl::Func(map_func(args, f)),
+        Decl::Class(class) => Decl::Class(map_class(args, class)),
         Decl::Var(kind, del) => {
             Decl::Var(kind, del.into_iter().map(|part| {
-                let args = if let Pat::Ident(ref ident) = part.id {
-                    vec![ident_to_string_lit(ident)]
-                } else {
-                    vec![]
-                };
+                if let Pat::Ident(ref ident) = part.id {
+                    args.push(ident_to_string_lit(ident));
+                }
                 VarDecl {
                     id: part.id,
-                    init: part.init.map(|e| map_expr(args, e))
+                    init: part.init.map(|e| map_expr(args.clone(), e))
                 }
             }).collect())
         }
@@ -54,9 +52,9 @@ fn map_decl<'a>(decl: Decl<'a>) -> Decl<'a> {
     }
 }
 
-fn map_stmt<'a>(stmt: Stmt<'a>) -> Stmt<'a> {
+fn map_stmt<'a>(args: Vec<Expr<'a>>, stmt: Stmt<'a>) -> Stmt<'a> {
     match stmt {
-        Stmt::Expr(expr) => Stmt::Expr(map_expr(vec![], expr)),
+        Stmt::Expr(expr) => Stmt::Expr(map_expr(args, expr)),
         _ => stmt.clone(),
     }
 }
@@ -67,7 +65,6 @@ fn map_expr<'a>(mut args: Vec<Expr<'a>>, expr: Expr<'a>) -> Expr<'a> {
         Expr::Class(c) => Expr::Class(map_class(args, c)),
         Expr::ArrowFunc(f) => Expr::ArrowFunc(map_arrow_func(args, f)),
         Expr::Assign(mut assign) => {
-            println!("{:?}", assign.left);
             if let Some(expr) = assign_left_to_string_lit(&assign.left) {
                 args.push(expr);
             }
@@ -84,11 +81,9 @@ fn map_func<'a>(mut args: Vec<Expr<'a>>, mut func: Func<'a>) -> Func<'a> {
     if let Some(ref id) = &func.id {
         args.push(ident_to_string_lit(id));
     }
-    args.extend(
-        extract_idents_from_args(&func.params)
-    );
-    func.body = FuncBody(func.body.0.into_iter().map(map_part).collect());
-    insert_expr_into_func(console_log(args), &mut func);
+    let local_args = extract_idents_from_args(&func.params);
+    func.body = FuncBody(func.body.0.into_iter().map(|p| map_part(args.clone(), p)).collect());
+    insert_expr_into_func(console_log(args.clone().into_iter().chain(local_args.into_iter()).collect()), &mut func);
     func
 }
 
@@ -174,7 +169,7 @@ fn map_class<'a>(mut args: Vec<Expr<'a>>, mut class: Class<'a>) -> Class<'a> {
 fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
     match prop.kind {
         PropKind::Ctor => {
-            args.insert(args.len().saturating_sub(2), Expr::Lit(Lit::String(StringLit::single_from("new"))));
+            args.insert(args.len().saturating_sub(1), Expr::Lit(Lit::String(StringLit::single_from("new"))));
         },
         PropKind::Get => {
             args.push(
