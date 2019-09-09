@@ -87,6 +87,102 @@ fn map_func<'a>(mut args: Vec<Expr<'a>>, mut func: Func<'a>) -> Func<'a> {
     func
 }
 
+fn map_class<'a>(mut args: Vec<Expr<'a>>, mut class: Class<'a>) -> Class<'a> {
+    if let Some(ref id) = class.id {
+        args.push(ident_to_string_lit(id))
+    }
+    let mut new_body = vec![];
+    for item in class.body.0 {
+        new_body.push(map_class_prop(args.clone(), item))
+    }
+    class.body = ClassBody(new_body);
+    class
+}
+
+fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
+    match prop.kind {
+        PropKind::Ctor => {
+            args.insert(args.len().saturating_sub(1), Expr::Lit(Lit::String(StringLit::single_from("new"))));
+        },
+        PropKind::Get => {
+            args.push(
+                Expr::Lit(Lit::String(StringLit::single_from("get")))
+            );
+        },
+        PropKind::Set => {
+            args.push(
+                Expr::Lit(Lit::String(StringLit::single_from("set")))
+            );
+        },
+        _ => (),
+    };
+    match &prop.key {
+        PropKey::Expr(ref expr) => match expr {
+            Expr::Ident(ref i) => {
+                if i.name != "constructor" {
+                    args.push(ident_to_string_lit(i));
+                }
+            }
+            _ => (),
+        },
+        PropKey::Lit(ref l) => match l {
+            Lit::Boolean(_)
+            | Lit::Number(_)
+            | Lit::RegEx(_)
+            | Lit::String(_) => {
+                args.push(Expr::Lit(l.clone()))
+            }
+            Lit::Null => {
+                args.push(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(String::from("null"))))));
+            }
+            _ => (),
+        },
+        PropKey::Pat(ref p) => {
+            match p {
+                Pat::Ident(ref i) => args.push(ident_to_string_lit(i)),
+                _ => args.extend(extract_idents_from_pat(p).into_iter().filter_map(|e| e)),
+            }
+        },
+    }
+    if let PropValue::Expr(expr) = prop.value {
+        prop.value = PropValue::Expr(map_expr(args, expr));
+    }
+    prop
+}
+
+fn map_arrow_func<'a>(mut args: Vec<Expr<'a>>, mut f: ArrowFuncExpr<'a>) -> ArrowFuncExpr<'a> {
+    args.extend(extract_idents_from_args(&f.params));
+    match &mut f.body {
+        ArrowFuncBody::FuncBody(ref mut body) => {
+            insert_expr_into_func_body(console_log(args), body)
+        },
+        ArrowFuncBody::Expr(expr) => {
+            f.body = ArrowFuncBody::FuncBody(FuncBody(vec![
+                console_log(args),
+                ProgramPart::Stmt(
+                    Stmt::Return(
+                        Some(*expr.clone())
+                    )
+                )
+            ]))
+        }
+    }
+    f
+}
+
+fn assign_left_to_string_lit<'a>(left: &AssignLeft<'a>) -> Option<Expr<'a>> {
+    match left {
+        AssignLeft::Expr(expr) => expr_to_string_lit(expr),
+        AssignLeft::Pat(pat) => {
+            match pat {
+                Pat::Ident(ident) => Some(ident_to_string_lit(ident)),
+                _ => None,
+            }
+        }
+    }
+}
+
+
 fn extract_idents_from_args<'a>(args: &[FuncArg<'a>]) -> Vec<Expr<'a>> {
     let mut ret = vec![];
     for arg in args {
@@ -154,84 +250,11 @@ fn extract_idents_from_pat<'a>(pat: &Pat<'a>) -> Vec<Option<Expr<'a>>> {
     }
 }
 
-fn map_class<'a>(mut args: Vec<Expr<'a>>, mut class: Class<'a>) -> Class<'a> {
-    if let Some(ref id) = class.id {
-        args.push(ident_to_string_lit(id))
-    }
-    let mut new_body = vec![];
-    for item in class.body.0 {
-        new_body.push(map_class_prop(args.clone(), item))
-    }
-    class.body = ClassBody(new_body);
-    class
-}
-
-fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
-    match prop.kind {
-        PropKind::Ctor => {
-            args.insert(args.len().saturating_sub(1), Expr::Lit(Lit::String(StringLit::single_from("new"))));
-        },
-        PropKind::Get => {
-            args.push(
-                Expr::Lit(Lit::String(StringLit::single_from("get")))
-            );
-        },
-        PropKind::Set => {
-            args.push(
-                Expr::Lit(Lit::String(StringLit::single_from("set")))
-            );
-        },
-        _ => (),
-    };
-    match &prop.key {
-        PropKey::Expr(ref expr) => match expr {
-            Expr::Ident(ref i) => {
-                if i.name != "constructor" {
-                    args.push(ident_to_string_lit(i));
-                }
-            }
-            _ => (),
-        },
-        PropKey::Lit(ref l) => match l {
-            Lit::Boolean(_)
-            | Lit::Number(_)
-            | Lit::RegEx(_)
-            | Lit::String(_) => {
-                args.push(Expr::Lit(l.clone()))
-            }
-            Lit::Null => {
-                args.push(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(String::from("null"))))));
-            }
-            _ => (),
-        },
-        PropKey::Pat(ref p) => {
-            match p {
-                Pat::Ident(ref i) => args.push(ident_to_string_lit(i)),
-                _ => args.extend(extract_idents_from_pat(p).into_iter().filter_map(|e| e)),
-            }
-        },
-    }
-    if let PropValue::Expr(expr) = prop.value {
-        prop.value = PropValue::Expr(map_expr(args, expr));
-    }
-    prop
-}
-
-fn assign_left_to_string_lit<'a>(left: &AssignLeft<'a>) -> Option<Expr<'a>> {
-    match left {
-        AssignLeft::Expr(expr) => expr_to_string_lit(expr),
-        AssignLeft::Pat(pat) => {
-            match pat {
-                Pat::Ident(ident) => Some(ident_to_string_lit(ident)),
-                _ => None,
-            }
-        }
-    }
-}
 fn expr_to_string_lit<'a>(e: &Expr<'a>) -> Option<Expr<'a>> {
     let inner = expr_to_string(e)?;
     Some(Expr::Lit(Lit::String(StringLit::Single(::std::borrow::Cow::Owned(inner)))))
 }
+
 fn expr_to_string(expr: &Expr) -> Option<String> {
     match expr {
         Expr::Ident(ref ident) => Some(ident.name.to_string()),
@@ -262,28 +285,9 @@ fn expr_to_string(expr: &Expr) -> Option<String> {
         _ => None,
     }
 }
+
 fn ident_to_string_lit<'a>(i: &Ident<'a>) -> Expr<'a> {
     Expr::Lit(Lit::String(StringLit::Single(i.name.clone())))
-}
-
-fn map_arrow_func<'a>(mut args: Vec<Expr<'a>>, mut f: ArrowFuncExpr<'a>) -> ArrowFuncExpr<'a> {
-    args.extend(extract_idents_from_args(&f.params));
-    match &mut f.body {
-        ArrowFuncBody::FuncBody(ref mut body) => {
-            insert_expr_into_func_body(console_log(args), body)
-        },
-        ArrowFuncBody::Expr(expr) => {
-            f.body = ArrowFuncBody::FuncBody(FuncBody(vec![
-                console_log(args),
-                ProgramPart::Stmt(
-                    Stmt::Return(
-                        Some(*expr.clone())
-                    )
-                )
-            ]))
-        }
-    }
-    f
 }
 
 fn insert_expr_into_func<'a>(expr: ProgramPart<'a>, func: &mut Func<'a>) {

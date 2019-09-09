@@ -12,6 +12,8 @@ repository = "https://github.com/FreeMasen/RESW"
 resast = "0.4.0"
 log = "0.4"
 ress = "0.7"
+# dev-dependencies for moz_central test only
+# these significantly increase compile time
 reqwest = { version = "0.9", optional = true}
 flate2 = { version = "1", optional = true}
 tar = { version = "0.4", optional = true}
