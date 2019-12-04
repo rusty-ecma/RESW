@@ -998,7 +998,11 @@ impl<T: Write> Writer<T> {
             self.write("static ")?;
         }
         match &prop.kind {
-            PropKind::Init => self.write_init_property(prop),
+            PropKind::Init => if prop.method {
+                self.write_property_method(prop)
+            } else {
+                self.write_init_property(prop)
+            },
             PropKind::Get => self.write_get_property(prop),
             PropKind::Set => self.write_set_property(prop),
             PropKind::Method => self.write_property_method(prop),
@@ -1013,10 +1017,6 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_init_property(&mut self, prop: &Prop) -> Res {
         trace!("write_init_property");
-        match &prop.value {
-            PropValue::Expr(Expr::Func(_)) => return self.write_property_method(prop),
-            _ => (),
-        }
         self.write_property_key(&prop.key, prop.computed)?;
         if prop.value != PropValue::None {
             self.write(": ")?;
