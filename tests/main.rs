@@ -1,10 +1,5 @@
 #![cfg(test)]
-#[cfg(feature = "moz_central")]
-extern crate reqwest;
-#[cfg(feature = "moz_central")]
-extern crate flate2;
-#[cfg(feature = "moz_central")]
-extern crate tar;
+
 #[cfg(feature = "moz_central")]
 extern crate rayon;
 #[cfg(feature = "moz_central")]

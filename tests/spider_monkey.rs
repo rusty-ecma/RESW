@@ -1,18 +1,19 @@
 #![cfg(all(test, feature = "moz_central"))]
 use resw::{
     Writer,
-    write_str::WriteString,    
+    write_str::WriteString, 
 };
-use ressa::{Parser, Error};
-use flate2::read::GzDecoder;
 use std::path::Path;
-
+use ressa::{
+    Parser,
+    Error
+};
 
 #[test]
 fn moz_central() {
     let moz_central_path = Path::new("./moz-central");
     if !moz_central_path.exists() {
-        get_moz_central_test_files(&moz_central_path);
+        panic!("Please download the spider monkey JIT Test files to run this test (see CONTRIBUTING.md)");
     }
     let msgs = walk(&moz_central_path);
     if !msgs.is_empty() {
@@ -104,16 +105,6 @@ fn around_once(js: &str) -> Result<String, Error> {
     Ok(out.get_string().expect("invalid utf8 written to write_string"))
 }
 
-fn get_moz_central_test_files(path: &Path) {
-    let mut response = reqwest::get("https://hg.mozilla.org/mozilla-central/archive/tip.tar.gz/js/src/jit-test/tests/")
-        .expect("Failed to get zip of moz-central");
-    let mut buf = Vec::new();
-    response.copy_to(&mut buf)
-        .expect("failed to copy to BzDecoder");
-    let gz = GzDecoder::new(buf.as_slice());
-    let mut t = tar::Archive::new(gz);
-    t.unpack(path).expect("Failed to unpack gz");
-}
 fn check_round_trips(path: &Path, first: &str, second: &Option<String>) -> Option<String> {
     let name = path.file_name().unwrap().to_str().unwrap();
     if let Some(ref js) = second {
