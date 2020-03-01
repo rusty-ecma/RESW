@@ -9,13 +9,13 @@ readme = "./README.md"
 repository = "https://github.com/FreeMasen/RESW"
 
 [dependencies]
-resast = "0.4.0"
+resast = "0.4.1"
 log = "0.4"
-ress = "0.7"
+ress = "0.9"
 
 [dev-dependencies]
 rayon = { version = "1"}
-ressa = { git = "https://github.com/FreeMasen/RESSA", branch = "featureless_test262" }
+ressa = "0.7.0"
 pretty_env_logger = "0.3"
 
 [features]

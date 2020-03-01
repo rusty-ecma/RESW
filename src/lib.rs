@@ -1940,6 +1940,7 @@ impl<T: Write> Writer<T> {
                 comment.content,
                 comment.tail_content.unwrap_or("")
             ))?,
+            CommentKind::Hashbang => self.write(&format!("#! {}", comment.content))?,
         }
         Ok(())
     }
