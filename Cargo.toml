@@ -1,24 +1,23 @@
 [package]
 name = "resw"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Robert Masen <r@robertmasen.pizza>"]
 edition = "2018"
 description = "A library for writing RESSA AST parts to a file"
 license = "MIT"
 readme = "./README.md"
-repository = "https://github.com/FreeMasen/RESW"
+repository = "https://github.com/rusty-ecma/RESW"
 
 [dependencies]
-ressa = "0.6.0"
-resast = "0.3.0"
+resast = "0.4.1"
 log = "0.4"
+ress = "0.9"
+
+[dev-dependencies]
+rayon = { version = "1"}
+ressa = "0.7.0"
 pretty_env_logger = "0.3"
-ress = "0.7"
-reqwest = { version = "0.9", optional = true}
-flate2 = { version = "1", optional = true}
-tar = { version = "0.4", optional = true}
-rayon = { version = "1", optional = true}
 
 [features]
 default = []
-moz_central = ["reqwest", "flate2", "tar", "rayon"]
+moz_central = []

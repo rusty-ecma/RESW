@@ -1,16 +1,11 @@
 #![cfg(test)]
-#[cfg(feature = "moz_central")]
-extern crate reqwest;
-#[cfg(feature = "moz_central")]
-extern crate flate2;
-#[cfg(feature = "moz_central")]
-extern crate tar;
+
 #[cfg(feature = "moz_central")]
 extern crate rayon;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
-use resast::ref_tree::AsConcrete;
-use ressa::Builder;
+use ressa::Parser;
+
 use resw::{
     Writer,
     write_str::WriteString,    
@@ -98,8 +93,7 @@ fn moment() {
 fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
     let mut second_write = WriteString::new();
-    let mut b = Builder::new();
-    let first_parser = b.module(module).js(js).build().expect("Failed to create parser");
+    let first_parser = Parser::builder().module(module).js(js).build().expect("Failed to create parser");
     let mut first_writer = Writer::new(first_write.generate_child());
     for part in first_parser {
         let part = match part {
@@ -112,8 +106,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
         first_writer.write_part(&part.as_concrete()).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
-    let mut b = Builder::new();
-    let second_parser = b.module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
+    let second_parser = Parser::builder().module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
     let mut second_writer = Writer::new(second_write.generate_child());
     for part in second_parser {
         let part = match part {
@@ -155,10 +148,21 @@ pub(crate) fn check_round_trips(name: &str, first: &str, second: &Option<String>
         if first != second {
             write_failure(name, first, second);
             panic!("Double round trip failed for {0}\ncheck ./test_failures/{0}.first.js and ./test_failures/{0}.second.js", name);
+        } else {
+            let mut env_write = false;
+            for (key, val) in ::std::env::vars() {
+                if key == "RESW_WRITE" && val == "1" {
+                    env_write = true;
+                    break;
+                }
+            }
+            if env_write {
+                write_failure(name, first, second);
+            }
         }
     } else {
         ::std::fs::write(&format!("test_failures/{}.first.js", name), first).expect("Failed to write file");
-        panic!("Double round trip failed to parse second pass for {0}\n chec ./test_failures/{0}.first.js", name);
+        panic!("Double round trip failed to parse second pass for {0}\n check ./test_failures/{0}.first.js", name);
     }
 }
 
@@ -172,4 +176,14 @@ fn new_member_expr_failure() {
 }";
     let (first, second) = double_round_trip(js, false);
     check_round_trips("new_member_expr_failure", &first, &second);
+}
+
+#[test]
+fn long_args_failure() {
+    let js = "
+function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
+";
+    let (first, second) = double_round_trip(js, false);
+    check_round_trips("long_args_failure", &first, &second);
+    println!("{:#?}", first);
 }
