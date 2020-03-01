@@ -1926,11 +1926,13 @@ impl<T: Write> Writer<T> {
         let _ = self.out.write(s.as_bytes())?;
         Ok(())
     }
+  
     fn write_char(&mut self, c: char) -> Res {
         let mut buf = [0u8;4];
         let _ = self.out.write(c.encode_utf8(&mut buf).as_bytes())?;
         Ok(())
     }
+
     pub fn write_comment(&mut self, comment: Comment<&str>) -> Res {
         match comment.kind {
             CommentKind::Single => self.write(&format!("//{}", comment.content))?,
