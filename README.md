@@ -25,7 +25,7 @@ use srd::fs::{read_to_string, File);
 fn main() {
     let js = read_to_string("example.js").expect("failed to read example.js");
     let p = Parser::new(&js).expect("failed to create parser");
-    let f = Filem:create("example.out.js");
+    let f = File::create("example.out.js");
     let mut w = Writer::new(f);
     for part in p {
         w.write_part(part).expect(&format!("failed to write part {:?}", part));
@@ -73,11 +73,11 @@ I have some ambitous things in store for RESS/RESSA for the next year, changes t
   - this will allow RESW to increase the fedility of the generated JS
 
 ## Contributing
-If you are interested in helping, it woud be appreciayed. At this point I would encourage you to look at improving RESS or RESSA before trying to find a way to contribut here. If you have a contribution I ask that you please open an issue before digging too deep into it so we can both be on the same page. 
+If you are interested in helping, it would be appreciated. At this point I would encourage you to look at improving RESS or RESSA before trying to find a way to contribute here. If you have a contribution I ask that you please open an issue before digging too deep into it so we can both be on the same page. 
 
 ### Some places that would be great to see some help
 - examples
   - My imagination is only so big, even just ideas for dev tools that might need a writer (that aren't a bable clone or js minifier) would be amazing
   - If you wanted to build a JS minifier I would be truely flattered
-    - Though currently there is no mechanizism not include new line characters
+    - Though currently there is no mechanism excluding new line characters
 
