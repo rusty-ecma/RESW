@@ -1472,6 +1472,7 @@ impl<T: Write> Writer<T> {
             | Expr::Conditional(_)
             | Expr::Logical(_) 
             | Expr::Func(_)
+            | Expr::Binary(_)
             | Expr::ArrowFunc(_) => self.write_wrapped_expr(side),
             _ => self.write_expr(side),
         }
