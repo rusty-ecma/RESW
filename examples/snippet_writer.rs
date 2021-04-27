@@ -2,7 +2,6 @@ use ressa::{Parser};
 use resw::Writer;
 use std::fs::{read_to_string, File};
 use pretty_env_logger::init;
-use resast::ref_tree::AsConcrete;
 
 pub fn main() {
     ::std::env::set_var("RUST_LOG", "resw=trace");
@@ -22,6 +21,6 @@ pub fn main() {
 
     for part in p {
         let part = part.expect("Failed to get part");
-        w.write_part(&part.as_concrete()).expect(&format!("Failed to write {:?}", part));
+        w.write_part(&part).expect(&format!("Failed to write {:?}", part));
     }
 }
