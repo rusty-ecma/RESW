@@ -103,7 +103,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 break;
             },
         };
-        first_writer.write_part(&part.as_concrete()).expect("Failed to write part");
+        first_writer.write_part(&part).expect("Failed to write part");
     }
     let first_pass = first_write.get_string().expect("Invalid utf-8 written to first write");
     let second_parser = Parser::builder().module(module).js(first_pass.as_str()).build().expect("Failed to create second parser");
@@ -122,7 +122,7 @@ fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
                 return (first_pass, second_pass)
             },
         };
-        second_writer.write_part(&part.as_concrete()).expect("failed to write part");
+        second_writer.write_part(&part).expect("failed to write part");
     }
     let second_pass = second_write.get_string().expect("Invalid utf-8 written to second write");
     (first_pass, Some(second_pass))
