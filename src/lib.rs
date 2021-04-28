@@ -2,11 +2,8 @@
 extern crate log;
 use resast::prelude::*;
 
+use ress::{prelude::Comment, tokens::CommentKind};
 use std::io::{Error as IoError, Write};
-use ress::{
-    prelude::Comment,
-    tokens::CommentKind,
-};
 pub mod write_str;
 
 /// The writer that will take in
@@ -125,13 +122,13 @@ impl<T: Write> Writer<T> {
     }
     /// This will loop over the contents of a `Program` and
     /// attempt write them all to the provided `impl Write`
-    /// 
+    ///
     /// > Note: This will take the concrete version of the `resast` tree
     /// > to allow for easier mutation of any string contents
     /// > by enabling the use of `format!`. If using this in
     /// > conjunction with `ressa` you will need to call the `AsConcrete`
     /// > trait method `as_concrete` to convert the output into
-    /// > the right type for input here. 
+    /// > the right type for input here.
     pub fn write_program(&mut self, program: &Program) -> Res {
         let parts = match program {
             Program::Script(ref parts) => parts,
@@ -171,12 +168,12 @@ impl<T: Write> Writer<T> {
                 self.at_top_level = false;
                 self.write_class(class)?;
                 self.write_new_line()?;
-            },
+            }
             Decl::Func(ref func) => {
                 self.at_top_level = false;
                 self.write_function(func)?;
                 self.write_new_line()?;
-            },
+            }
             Decl::Export(ref exp) => self.write_export_decl(exp)?,
             Decl::Import(ref imp) => self.write_import_decl(imp)?,
         };
@@ -463,14 +460,11 @@ impl<T: Write> Writer<T> {
         match stmt {
             Stmt::Empty => {
                 new_line = false;
-            },
+            }
             Stmt::Debugger => self.write_debugger_stmt()?,
             Stmt::Expr(ref stmt) => {
                 let wrap = match stmt {
-                    Expr::Lit(_)
-                    | Expr::Obj(_)
-                    | Expr::Func(_) 
-                    | Expr::Binary(_) => true,
+                    Expr::Lit(_) | Expr::Obj(_) | Expr::Func(_) | Expr::Binary(_) => true,
                     _ => false,
                 };
                 if wrap {
@@ -478,7 +472,7 @@ impl<T: Write> Writer<T> {
                 } else {
                     self.write_expr(stmt)?
                 }
-            },
+            }
             Stmt::Block(ref stmt) => {
                 self.at_top_level = false;
                 self.write_block_stmt(&stmt.0)?;
@@ -998,11 +992,13 @@ impl<T: Write> Writer<T> {
             self.write("static ")?;
         }
         match &prop.kind {
-            PropKind::Init => if prop.method {
-                self.write_property_method(prop)
-            } else {
-                self.write_init_property(prop)
-            },
+            PropKind::Init => {
+                if prop.method {
+                    self.write_property_method(prop)
+                } else {
+                    self.write_init_property(prop)
+                }
+            }
             PropKind::Get => self.write_get_property(prop),
             PropKind::Set => self.write_set_property(prop),
             PropKind::Method => self.write_property_method(prop),
@@ -1023,8 +1019,7 @@ impl<T: Write> Writer<T> {
         }
         match &prop.value {
             PropValue::None => (),
-            PropValue::Expr(_)
-            | PropValue::Pat(_) => {
+            PropValue::Expr(_) | PropValue::Pat(_) => {
                 self.write_property_value(&prop.value)?;
             }
         }
@@ -1219,7 +1214,7 @@ impl<T: Write> Writer<T> {
         self.write_pattern(pat)?;
         Ok(())
     }
-    
+
     pub fn write_assignment_pattern(&mut self, assignment: &AssignPat) -> Res {
         trace!("write_assignment_pattern");
         self.write_pattern(&assignment.left)?;
@@ -1255,7 +1250,7 @@ impl<T: Write> Writer<T> {
             Expr::Assign(ref expr) => {
                 self.at_top_level = false;
                 self.write_assignment_expr(expr)?
-            },
+            }
             Expr::Logical(ref expr) => self.write_logical_expr(expr)?,
             Expr::Member(ref expr) => self.write_member_expr(expr)?,
             Expr::Conditional(ref expr) => self.write_conditional_expr(expr)?,
@@ -1385,17 +1380,16 @@ impl<T: Write> Writer<T> {
             self.write_unary_operator(&unary.operator)?;
         }
         match &*unary.argument {
-            Expr::Assign(_) 
-            | Expr::Binary(_) 
+            Expr::Assign(_)
+            | Expr::Binary(_)
             | Expr::Logical(_)
-            | Expr::Conditional(_) 
-            | Expr::ArrowFunc(_) 
+            | Expr::Conditional(_)
+            | Expr::ArrowFunc(_)
             | Expr::Func(_) => self.write_wrapped_expr(&unary.argument)?,
-            Expr::Unary(_) 
-            | Expr::Update(_) => {
+            Expr::Unary(_) | Expr::Update(_) => {
                 self.write(" ")?;
                 self.write_expr(&unary.argument)?;
-            },
+            }
             _ => self.write_expr(&unary.argument)?,
         }
         if !unary.prefix {
@@ -1470,7 +1464,7 @@ impl<T: Write> Writer<T> {
         match &*side {
             Expr::Assign(_)
             | Expr::Conditional(_)
-            | Expr::Logical(_) 
+            | Expr::Logical(_)
             | Expr::Func(_)
             | Expr::Binary(_)
             | Expr::ArrowFunc(_) => self.write_wrapped_expr(side),
@@ -1516,15 +1510,14 @@ impl<T: Write> Writer<T> {
         trace!("write_assignment_expr");
         let wrap_self = match &assignment.left {
             AssignLeft::Expr(ref e) => match &**e {
-                Expr::Obj(_) 
-                | Expr::Array(_) => true,
+                Expr::Obj(_) | Expr::Array(_) => true,
                 _ => false,
-            }, 
+            },
             AssignLeft::Pat(ref p) => match p {
                 Pat::Array(_) => true,
                 Pat::Obj(_) => true,
                 _ => false,
-            }
+            },
         };
         if wrap_self {
             self.write("(")?;
@@ -1571,8 +1564,7 @@ impl<T: Write> Writer<T> {
         trace!("write_logical_expr {:#?}", logical);
         let wrap_left = match &*logical.left {
             Expr::Logical(ref l) => l.operator == LogicalOp::Or,
-            Expr::Assign(_)
-            | Expr::Conditional(_) => true,
+            Expr::Assign(_) | Expr::Conditional(_) => true,
             _ => false,
         };
         if wrap_left {
@@ -1584,8 +1576,7 @@ impl<T: Write> Writer<T> {
         self.write_logical_operator(&logical.operator)?;
         let wrap_right = match &*logical.right {
             Expr::Logical(ref _l) => true,
-            Expr::Assign(_)
-            | Expr::Conditional(_) => true,
+            Expr::Assign(_) | Expr::Conditional(_) => true,
             _ => false,
         };
         self.write(" ")?;
@@ -1614,14 +1605,14 @@ impl<T: Write> Writer<T> {
     pub fn write_member_expr(&mut self, member: &MemberExpr) -> Res {
         trace!("write_member_expr");
         match &*member.object {
-            Expr::Assign(_) 
+            Expr::Assign(_)
             | Expr::Lit(Lit::Number(_))
             | Expr::Conditional(_)
-            | Expr::Logical(_) 
+            | Expr::Logical(_)
             | Expr::Func(_)
             | Expr::ArrowFunc(_)
             | Expr::Obj(_)
-            | Expr::Binary(_) 
+            | Expr::Binary(_)
             | Expr::Unary(_)
             | Expr::Update(_) => self.write_wrapped_expr(&member.object)?,
             _ => self.write_expr(&member.object)?,
@@ -1663,8 +1654,7 @@ impl<T: Write> Writer<T> {
     pub fn write_call_expr(&mut self, call: &CallExpr) -> Res {
         trace!("write_call_expr");
         match &*call.callee {
-            Expr::Func(_) 
-            | Expr::ArrowFunc(_) => self.write_wrapped_expr(&call.callee)?,
+            Expr::Func(_) | Expr::ArrowFunc(_) => self.write_wrapped_expr(&call.callee)?,
             _ => self.write_expr(&call.callee)?,
         }
         self.write_sequence_expr(&call.arguments)?;
@@ -1678,8 +1668,7 @@ impl<T: Write> Writer<T> {
         trace!("write_new_expr");
         self.write("new ")?;
         match &*new.callee {
-            Expr::Assign(_) 
-            | Expr::Call(_) => self.write_wrapped_expr(&new.callee)?,
+            Expr::Assign(_) | Expr::Call(_) => self.write_wrapped_expr(&new.callee)?,
             _ => self.write_expr(&new.callee)?,
         }
         self.write_sequence_expr(&new.arguments)?;
@@ -1729,13 +1718,13 @@ impl<T: Write> Writer<T> {
         if func.params.len() == 1 {
             match &func.params[0] {
                 FuncArg::Expr(ref arg) => match arg {
-                    Expr::Ident(_)=> self.write_function_arg(&func.params[0])?,
+                    Expr::Ident(_) => self.write_function_arg(&func.params[0])?,
                     _ => self.write_function_args(&func.params)?,
                 },
                 FuncArg::Pat(ref arg) => match arg {
                     Pat::Ident(_) => self.write_function_arg(&func.params[0])?,
                     _ => self.write_function_args(&func.params)?,
-                }
+                },
             }
         } else {
             self.write_function_args(&func.params)?;
@@ -1743,13 +1732,10 @@ impl<T: Write> Writer<T> {
         self.write(" => ")?;
         match &func.body {
             ArrowFuncBody::FuncBody(ref b) => self.write_function_body(b)?,
-            ArrowFuncBody::Expr(ref e) => {
-                match &**e {
-                    Expr::Obj(_) 
-                    | Expr::Binary(_) => self.write_wrapped_expr(e)?,
-                    _ => self.write_expr(e)?,
-                }
-            }
+            ArrowFuncBody::Expr(ref e) => match &**e {
+                Expr::Obj(_) | Expr::Binary(_) => self.write_wrapped_expr(e)?,
+                _ => self.write_expr(e)?,
+            },
         }
         Ok(())
     }
@@ -1853,8 +1839,7 @@ impl<T: Write> Writer<T> {
         if let Some(c) = self.quote {
             self.write_char(c)?;
             match s {
-                StringLit::Double(s)
-                | StringLit::Single(s) => self.write(s)?,
+                StringLit::Double(s) | StringLit::Single(s) => self.write(s)?,
             }
             self.write_char(c)?;
         } else {
@@ -1927,9 +1912,9 @@ impl<T: Write> Writer<T> {
         let _ = self.out.write(s.as_bytes())?;
         Ok(())
     }
-  
+
     fn write_char(&mut self, c: char) -> Res {
-        let mut buf = [0u8;4];
+        let mut buf = [0u8; 4];
         let _ = self.out.write(c.encode_utf8(&mut buf).as_bytes())?;
         Ok(())
     }
@@ -1978,7 +1963,7 @@ mod test {
             &VarKind::Var,
             &[VarDecl {
                 id: Pat::ident_from("thing"),
-                init: Some(Expr::Lit(Lit::Boolean(false)))
+                init: Some(Expr::Lit(Lit::Boolean(false))),
             }],
         )
         .unwrap();
@@ -1999,9 +1984,8 @@ mod test {
                 },
                 VarDecl {
                     id: Pat::ident_from("thing"),
-                    init: Some(Expr::Lit(
-                    Lit::Boolean(false))),
-                }
+                    init: Some(Expr::Lit(Lit::Boolean(false))),
+                },
             ],
         )
         .unwrap();
