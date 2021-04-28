@@ -1,27 +1,19 @@
-use std::{
-    io::{
-        Write, Result as IoResult
-    },
-};
+use std::io::{Result as IoResult, Write};
 
 pub struct WriteString {
     buf: Vec<u8>,
 }
 
 pub struct ChildWriter<'a> {
-    parent: &'a mut WriteString
+    parent: &'a mut WriteString,
 }
 
 impl WriteString {
     pub fn new() -> Self {
-        Self {
-            buf: vec![],
-        }
+        Self { buf: vec![] }
     }
     pub fn generate_child(&mut self) -> ChildWriter {
-        ChildWriter {
-            parent: self
-        }
+        ChildWriter { parent: self }
     }
     pub fn get_string(&self) -> Result<String, ::std::string::FromUtf8Error> {
         String::from_utf8(self.buf.clone())
