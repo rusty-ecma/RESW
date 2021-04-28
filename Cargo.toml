@@ -11,12 +11,12 @@ repository = "https://github.com/rusty-ecma/RESW"
 [dependencies]
 resast = "0.4.1"
 log = "0.4"
-ress = "0.9"
+ress = "0.11"
 
 [dev-dependencies]
 rayon = { version = "1"}
 ressa = "0.7.0"
-pretty_env_logger = "0.3"
+pretty_env_logger = "0.4"
 
 [features]
 default = []
