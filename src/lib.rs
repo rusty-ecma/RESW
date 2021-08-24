@@ -1672,7 +1672,7 @@ impl<T: Write> Writer<T> {
         trace!("write_new_expr: {:?}", new);
         self.write("new ")?;
         match &*new.callee {
-            Expr::Assign(_) | Expr::Call(_) => self.write_wrapped_expr(&new.callee)?,
+            Expr::Assign(_) | Expr::Call(_) | Expr::Conditional(_) => self.write_wrapped_expr(&new.callee)?,
             Expr::Member(m) if matches!(&*m.object, Expr::Call(_)) => self.write_wrapped_expr(&new.callee)?,
             _ => self.write_expr(&new.callee)?,
         }
