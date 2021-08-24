@@ -1,21 +1,18 @@
-#![cfg(test)]
-
 #[cfg(feature = "moz_central")]
 extern crate rayon;
-mod snippets;
+mod common;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
 
-use ressa::Parser;
 
-use resw::{write_str::WriteString, Writer};
+
 
 #[test]
 fn everything_js_es5() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es5.js")
         .expect("Failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("everything.es5", &first, &second);
 }
 
@@ -24,7 +21,7 @@ fn everything_js_es2015_script() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es2015-script.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("everything.es2015-script", &first, &second);
 }
 
@@ -33,7 +30,7 @@ fn everything_js_es2015_module() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es2015-module.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, true);
+    let (first, second) = common::double_round_trip(&js, true);
     check_round_trips("everything.es2015-module", &first, &second);
 }
 
@@ -42,7 +39,7 @@ fn jquery() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/jquery/dist/jquery.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("jquery", &first, &second);
 }
 
@@ -51,7 +48,7 @@ fn angular() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/angular/angular.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("angular", &first, &second);
 }
 
@@ -60,7 +57,7 @@ fn react() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/react/cjs/react.development.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("react", &first, &second);
 }
 #[test]
@@ -68,7 +65,7 @@ fn react_dom() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/react-dom/cjs/react-dom.development.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("react_dom", &first, &second);
 }
 
@@ -77,7 +74,7 @@ fn vue() {
     ensure_libraries();
     let js =
         ::std::fs::read_to_string("node_modules/vue/dist/vue.js").expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("vue", &first, &second);
 }
 
@@ -86,7 +83,7 @@ fn dexie() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/dexie/dist/dexie.js")
         .expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("dexie", &first, &second);
 }
 
@@ -95,65 +92,11 @@ fn moment() {
     ensure_libraries();
     let js =
         ::std::fs::read_to_string("node_modules/moment/moment.js").expect("failed to read js file");
-    let (first, second) = double_round_trip(&js, false);
+    let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("moment", &first, &second);
 }
 
-pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
-    let mut first_write = WriteString::new();
-    let mut second_write = WriteString::new();
-    let first_parser = Parser::builder()
-        .module(module)
-        .js(js)
-        .build()
-        .expect("Failed to create parser");
-    let mut first_writer = Writer::new(first_write.generate_child());
-    for part in first_parser {
-        let part = match part {
-            Ok(part) => part,
-            Err(e) => {
-                println!("Error parsing part in first pass {}", e);
-                break;
-            }
-        };
-        first_writer
-            .write_part(&part)
-            .expect("Failed to write part");
-    }
-    let first_pass = first_write
-        .get_string()
-        .expect("Invalid utf-8 written to first write");
-    let second_parser = Parser::builder()
-        .module(module)
-        .js(first_pass.as_str())
-        .build()
-        .expect("Failed to create second parser");
-    let mut second_writer = Writer::new(second_write.generate_child());
-    for part in second_parser {
-        let part = match part {
-            Ok(part) => part,
-            Err(e) => {
-                println!("Error parsing part in second pass {}", e);
-                let parsed = second_write
-                    .get_string()
-                    .expect("Invalid utf-8 written to second write");
-                let second_pass = if parsed.len() == 0 {
-                    None
-                } else {
-                    Some(parsed)
-                };
-                return (first_pass, second_pass);
-            }
-        };
-        second_writer
-            .write_part(&part)
-            .expect("failed to write part");
-    }
-    let second_pass = second_write
-        .get_string()
-        .expect("Invalid utf-8 written to second write");
-    (first_pass, Some(second_pass))
-}
+
 
 fn write_failure(name: &str, first: &str, second: &str) {
     use std::io::Write;
@@ -209,7 +152,7 @@ fn new_member_expr_failure() {
     (node.nodeName  // We are a direct element.
     || (node.prop && node.attr && node.find)));  // We have an on and find method part of jQuery API.
 }";
-    let (first, second) = double_round_trip(js, false);
+    let (first, second) = common::double_round_trip(js, false);
     check_round_trips("new_member_expr_failure", &first, &second);
 }
 
@@ -218,7 +161,7 @@ fn long_args_failure() {
     let js = "
 function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
 ";
-    let (first, second) = double_round_trip(js, false);
+    let (first, second) = common::double_round_trip(js, false);
     check_round_trips("long_args_failure", &first, &second);
     println!("{:#?}", first);
 }
