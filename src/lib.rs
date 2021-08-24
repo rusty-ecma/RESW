@@ -1633,8 +1633,12 @@ impl<T: Write> Writer<T> {
     /// let x = isTrue ? 'yes' : 'no';
     /// ```
     pub fn write_conditional_expr(&mut self, conditional: &ConditionalExpr) -> Res {
-        trace!("write_conditional_expr");
-        self.write_expr(&conditional.test)?;
+        trace!("write_conditional_expr: {:?}", conditional);
+        if let Expr::Conditional(_) = &*conditional.test {
+            self.write_wrapped_expr(&conditional.test)?;
+        } else {
+            self.write_expr(&conditional.test)?;
+        }
         self.write(" ? ")?;
         if let Expr::Logical(_) = &*conditional.consequent {
             self.write_wrapped_expr(&conditional.consequent)?;
