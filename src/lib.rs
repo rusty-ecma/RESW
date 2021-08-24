@@ -1656,7 +1656,7 @@ impl<T: Write> Writer<T> {
     /// })()
     /// ```
     pub fn write_call_expr(&mut self, call: &CallExpr) -> Res {
-        trace!("write_call_expr");
+        trace!("write_call_expr: {:?}", call);
         match &*call.callee {
             Expr::Func(_) | Expr::ArrowFunc(_) => self.write_wrapped_expr(&call.callee)?,
             _ => self.write_expr(&call.callee)?,
@@ -1669,10 +1669,11 @@ impl<T: Write> Writer<T> {
     /// new Uint8Array(100);
     /// ```
     pub fn write_new_expr(&mut self, new: &NewExpr) -> Res {
-        trace!("write_new_expr");
+        trace!("write_new_expr: {:?}", new);
         self.write("new ")?;
         match &*new.callee {
             Expr::Assign(_) | Expr::Call(_) => self.write_wrapped_expr(&new.callee)?,
+            Expr::Member(m) if matches!(&*m.object, Expr::Call(_)) => self.write_wrapped_expr(&new.callee)?,
             _ => self.write_expr(&new.callee)?,
         }
         self.write_sequence_expr(&new.arguments)?;
