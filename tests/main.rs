@@ -2,8 +2,10 @@
 
 #[cfg(feature = "moz_central")]
 extern crate rayon;
+mod snippets;
 #[cfg(feature = "moz_central")]
 mod spider_monkey;
+
 use ressa::Parser;
 
 use resw::{write_str::WriteString, Writer};
@@ -97,7 +99,7 @@ fn moment() {
     check_round_trips("moment", &first, &second);
 }
 
-fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
+pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
     let mut second_write = WriteString::new();
     let first_parser = Parser::builder()
