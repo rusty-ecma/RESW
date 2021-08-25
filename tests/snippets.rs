@@ -66,7 +66,6 @@ fn complicated_args3() {
     common::round_trip_validate(js, false, "complicated_args3").unwrap();
 }
 
-
 #[test]
 fn new_member_expr_failure() {
     let js =
@@ -84,4 +83,16 @@ fn long_args_failure() {
 function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
 ";
     common::round_trip_validate(js, false, "long_args_failure").unwrap();
+}
+
+#[test]
+fn new_callee_logical() {
+    let js = "let a = {'b': new (c || d)};";
+    common::round_trip_validate(js, false, "new_callee_logical").unwrap();
+}
+
+#[test]
+fn unary_call() {
+    let js = "let a = (void 1)()";
+    common::round_trip_validate(js, false, "unary_call").unwrap();
 }

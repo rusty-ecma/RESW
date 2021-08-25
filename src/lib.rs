@@ -1669,10 +1669,14 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_call_expr(&mut self, call: &CallExpr) -> Res {
         trace!("write_call_expr: {:?}", call);
+
         match &*call.callee {
-            Expr::Func(_) | Expr::ArrowFunc(_) | Expr::Conditional(_) | Expr::Logical(_) => {
-                self.write_wrapped_expr(&call.callee)?
-            }
+            Expr::Func(_)
+            | Expr::ArrowFunc(_)
+            | Expr::Conditional(_)
+            | Expr::Logical(_)
+            | Expr::Unary(_)
+            | Expr::Assign(_) => self.write_wrapped_expr(&call.callee)?,
             _ => self.write_expr(&call.callee)?,
         }
         self.write_sequence_expr(&call.arguments)?;
@@ -1686,7 +1690,7 @@ impl<T: Write> Writer<T> {
         trace!("write_new_expr: {:?}", new);
         self.write("new ")?;
         match &*new.callee {
-            Expr::Assign(_) | Expr::Call(_) | Expr::Conditional(_) => {
+            Expr::Assign(_) | Expr::Call(_) | Expr::Conditional(_) | Expr::Logical(_) => {
                 self.write_wrapped_expr(&new.callee)?
             }
             Expr::Member(m) if matches!(&*m.object, Expr::Call(_)) => {
