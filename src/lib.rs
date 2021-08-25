@@ -895,7 +895,11 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_for_of_stmt(&mut self, stmt: &ForOfStmt) -> Result<bool, IoError> {
         trace!("write_for_of_stmt");
-        self.write("for (")?;
+        self.write("for ")?;
+        if stmt.is_await {
+            self.write("await ")?;
+        }
+        self.write("(")?;
         self.write_loop_left(&stmt.left)?;
         self.write(" of ")?;
         self.write_expr(&stmt.right)?;
