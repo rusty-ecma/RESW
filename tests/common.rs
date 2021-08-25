@@ -1,5 +1,7 @@
 use resast::{Program, ProgramPart};
 use ressa::Parser;
+use resw::{write_str::WriteString, Writer};
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
@@ -68,11 +70,7 @@ pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     (first_pass, Some(second_pass))
 }
 
-pub fn round_trip_validate<'a>(
-    js: &'a str,
-    module: bool,
-    name: &'static str,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
     let write_failures = std::env::var("RESW_WRITE_FAILURES") == Ok("1".to_string());
     let mut first_parser = Parser::builder().js(js).module(module).build()?;
     let first_parts = parse(&mut first_parser)?;
@@ -93,21 +91,39 @@ pub fn round_trip_validate<'a>(
         }
     };
     if first_parts != second_parts {
+        let ret = find_mismatched(first_parts, second_parts).unwrap();
+
         if write_failures {
-            write_failure(name, &second_js, &None);
+            let to_write = if let Error::Mismatched { left, right } = &ret {
+                format!("//{}\n//{}\n\n{}", left, right, second_js)
+            } else {
+                second_js
+            };
+            write_failure(name, &to_write, &None);
         }
-        for (lhs, rhs) in first_parts.into_iter().zip(second_parts.into_iter()) {
-            assert_eq!(lhs, rhs);
+        return Err(ret);
+    }
+    Ok(())
+}
+
+pub fn find_mismatched<'a>(
+    first_parts: Vec<ProgramPart<'a>>,
+    second_parts: Vec<ProgramPart<'a>>,
+) -> Option<Error> {
+    for (lhs, rhs) in first_parts.into_iter().zip(second_parts.into_iter()) {
+        if lhs != rhs {
+            return Some(Error::Mismatched {
+                left: format!("{:?}", lhs),
+                right: format!("{:?}", rhs),
+            });
         }
     }
-
-    // assert_eq!(first_parts, second_parts);
-    Ok(())
+    None
 }
 
 pub fn parse<'a>(
     p: &'a mut Parser<'a, ressa::DefaultCommentHandler>,
-) -> Result<Vec<ProgramPart<'a>>, Box<dyn std::error::Error>> {
+) -> Result<Vec<ProgramPart<'a>>, Error> {
     match p.parse()? {
         Program::Mod(parts) => Ok(parts),
         Program::Script(parts) => Ok(parts),
