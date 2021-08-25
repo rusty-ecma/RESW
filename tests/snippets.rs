@@ -65,3 +65,23 @@ fn complicated_args3() {
     let js = r#"function f({a}){}"#;
     common::round_trip_validate(js, false, "complicated_args3").unwrap();
 }
+
+
+#[test]
+fn new_member_expr_failure() {
+    let js =
+"function isElement(node) {
+  return !!(node &&
+    (node.nodeName  // We are a direct element.
+    || (node.prop && node.attr && node.find)));  // We have an on and find method part of jQuery API.
+}";
+    common::round_trip_validate(js, false, "new_member_expr_failure").unwrap();
+}
+
+#[test]
+fn long_args_failure() {
+    let js = "
+function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
+";
+    common::round_trip_validate(js, false, "long_args_failure").unwrap();
+}
