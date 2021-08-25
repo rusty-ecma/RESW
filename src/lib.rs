@@ -832,7 +832,7 @@ impl<T: Write> Writer<T> {
     ///     break;
     /// }
     pub fn write_for_stmt(&mut self, stmt: &ForStmt) -> Result<bool, IoError> {
-        trace!("write_for_stmt");
+        trace!("write_for_stmt: {:?}", stmt);
         self.write("for (")?;
         if let Some(ref init) = &stmt.init {
             self.write_loop_init(init)?;
@@ -918,14 +918,20 @@ impl<T: Write> Writer<T> {
     }
     /// Attempts to write for first part of a for of or for in loop's parenthetical
     pub fn write_loop_left(&mut self, left: &LoopLeft) -> Res {
+        log::trace!("write_loop_left {:?}", left);
+        
         match left {
-            LoopLeft::Pat(ref pat) => self.write_pattern(pat)?,
-            LoopLeft::Variable(ref kind, ref var) => {
+            LoopLeft::Pat(pat) => self.write_pattern(pat)?,
+            LoopLeft::Variable(kind, var) => {
+                let last_in_for_init = self.in_for_init;
+                self.in_for_init = true;
                 self.write_variable_kind(kind)?;
                 self.write_variable_decl(var)?;
+                self.in_for_init = last_in_for_init;
             }
-            LoopLeft::Expr(ref expr) => self.write_expr(expr)?,
+            LoopLeft::Expr(expr) => self.write_expr(expr)?,
         }
+        
         Ok(())
     }
     /// write a variable statment

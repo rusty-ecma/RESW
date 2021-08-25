@@ -30,3 +30,11 @@ fn assign_prop_in_arg() {
     let js = "let _ = (a, {b} = {b: 3}) => (a + b);";
     common::round_trip_validate(js, false, "assign_prop_in_arg").unwrap();
 }
+
+#[test]
+fn for_in_init_in() {
+    pretty_env_logger::try_init().ok();
+    let js = r#"for(var x=(0 in[])in{});"#;
+    common::round_trip_validate(js, false, "for_in_init_in").unwrap();
+}
+
