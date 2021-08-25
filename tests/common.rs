@@ -1,9 +1,16 @@
 use resast::{Program, ProgramPart};
 use ressa::Parser;
-use resw::{
-    write_str::{ChildWriter, WriteString},
-    Writer,
-};
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("{0}")]
+    Ressa(#[from] ressa::Error),
+    #[error("{0}")]
+    Io(#[from] std::io::Error),
+    #[error("{0}")]
+    Utf8(#[from] std::string::FromUtf8Error),
+    #[error("Mismatched parts:\n{left}\n{right}")]
+    Mismatched { left: String, right: String },
+}
 
 pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
