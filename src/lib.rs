@@ -911,7 +911,7 @@ impl<T: Write> Writer<T> {
     /// Attempts to write for first part of a for of or for in loop's parenthetical
     pub fn write_loop_left(&mut self, left: &LoopLeft) -> Res {
         log::trace!("write_loop_left {:?}", left);
-        
+
         match left {
             LoopLeft::Pat(pat) => self.write_pattern(pat)?,
             LoopLeft::Variable(kind, var) => {
@@ -923,7 +923,7 @@ impl<T: Write> Writer<T> {
             }
             LoopLeft::Expr(expr) => self.write_expr(expr)?,
         }
-        
+
         Ok(())
     }
     /// write a variable statment

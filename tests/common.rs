@@ -1,6 +1,9 @@
 use resast::{Program, ProgramPart};
 use ressa::Parser;
-use resw::{Writer, write_str::{ChildWriter, WriteString}};
+use resw::{
+    write_str::{ChildWriter, WriteString},
+    Writer,
+};
 
 pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
@@ -58,12 +61,13 @@ pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     (first_pass, Some(second_pass))
 }
 
-pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &'static str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn round_trip_validate<'a>(
+    js: &'a str,
+    module: bool,
+    name: &'static str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let write_failures = std::env::var("RESW_WRITE_FAILURES") == Ok("1".to_string());
-    let mut first_parser = Parser::builder()
-        .js(js)
-        .module(module)
-        .build()?;
+    let mut first_parser = Parser::builder().js(js).module(module).build()?;
     let first_parts = parse(&mut first_parser)?;
     let mut write_string = WriteString::new();
     let mut writer = Writer::new(write_string.generate_child());
@@ -71,22 +75,19 @@ pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &'static str) ->
         writer.write_part(part)?;
     }
     let second_js = write_string.get_string()?;
-    let mut second_parser = Parser::builder()
-        .js(&second_js)
-        .module(module)
-        .build()?;
+    let mut second_parser = Parser::builder().js(&second_js).module(module).build()?;
     let second_parts = match parse(&mut second_parser) {
         Ok(parts) => parts,
         Err(e) => {
             if write_failures {
                 write_failure(name, &second_js, &None);
             }
-            return Err(e)
+            return Err(e);
         }
     };
     if first_parts != second_parts {
         if write_failures {
-            write_failure(name, &second_js, &None); 
+            write_failure(name, &second_js, &None);
         }
         for (lhs, rhs) in first_parts.into_iter().zip(second_parts.into_iter()) {
             assert_eq!(lhs, rhs);
@@ -97,12 +98,13 @@ pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &'static str) ->
     Ok(())
 }
 
-pub fn parse<'a>(p :&'a mut Parser<'a, ressa::DefaultCommentHandler>) -> Result<Vec<ProgramPart<'a>>, Box<dyn std::error::Error>> {
+pub fn parse<'a>(
+    p: &'a mut Parser<'a, ressa::DefaultCommentHandler>,
+) -> Result<Vec<ProgramPart<'a>>, Box<dyn std::error::Error>> {
     match p.parse()? {
         Program::Mod(parts) => Ok(parts),
         Program::Script(parts) => Ok(parts),
     }
-    
 }
 
 pub fn write_failure(name: &str, first: &str, second: &Option<String>) {
