@@ -1010,10 +1010,12 @@ impl<T: Write> Writer<T> {
     /// }
     /// ```
     pub fn write_init_property(&mut self, prop: &Prop) -> Res {
-        trace!("write_init_property");
-        self.write_property_key(&prop.key, prop.computed)?;
-        if prop.value != PropValue::None {
-            self.write(": ")?;
+        trace!("write_init_property: {:?}", prop);
+        if !prop.short_hand || matches!(&prop.value, PropValue::None) {
+            self.write_property_key(&prop.key, prop.computed)?;
+            if prop.value != PropValue::None {
+                self.write(": ")?;
+            }
         }
         match &prop.value {
             PropValue::None => (),

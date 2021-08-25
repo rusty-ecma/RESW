@@ -44,3 +44,24 @@ fn if_zero_empty() {
     let js = r#"if(0);"#;
     common::round_trip_validate(js, false, "if_zero_empty").unwrap();
 }
+
+#[test]
+fn complicated_args1() {
+    pretty_env_logger::try_init().ok();
+    let js = r#"function f({i = 0}){}"#;
+    common::round_trip_validate(js, false, "complicated_args1").unwrap();
+}
+
+#[test]
+fn complicated_args2() {
+    pretty_env_logger::try_init().ok();
+    let js = r#"function f({a: b = 0}){}"#;
+    common::round_trip_validate(js, false, "complicated_args2").unwrap();
+}
+
+#[test]
+fn complicated_args3() {
+    pretty_env_logger::try_init().ok();
+    let js = r#"function f({a}){}"#;
+    common::round_trip_validate(js, false, "complicated_args3").unwrap();
+}
