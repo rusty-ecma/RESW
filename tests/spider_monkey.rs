@@ -2,6 +2,7 @@
 use ressa::{Error, Parser};
 use resw::{write_str::WriteString, Writer};
 use std::path::Path;
+mod common;
 
 #[test]
 fn moz_central() {
@@ -117,7 +118,7 @@ fn check_round_trips(path: &Path, first: &str, second: &Option<String>) -> Optio
     let name = path.file_name().unwrap().to_str().unwrap();
     if let Some(ref js) = second {
         if first != js {
-            write_failure(name, first, second);
+            common::write_failure(name, first, second);
             return Some(format!(
                 "Double round trip failed for {0}\ncheck ./{1}.first.js and ./{1}.second.js",
                 path.display(),
@@ -125,7 +126,7 @@ fn check_round_trips(path: &Path, first: &str, second: &Option<String>) -> Optio
             ));
         }
     } else {
-        write_failure(name, first, second);
+        common::write_failure(name, first, second);
         return Some(format!(
             "Double round trip failed to parse second pass for {}\n chec ./{}.first.js",
             path.display(),
@@ -133,25 +134,4 @@ fn check_round_trips(path: &Path, first: &str, second: &Option<String>) -> Optio
         ));
     }
     None
-}
-fn write_failure(name: &str, first: &str, second: &Option<String>) {
-    use std::io::Write;
-    let dir = ::std::path::PathBuf::from("test_failures");
-    if !dir.exists() {
-        ::std::fs::create_dir(&dir).expect("failed to create test_failures");
-    }
-    let mut f1 = ::std::fs::File::create(dir.join(&format!("{}.first.js", name)))
-        .expect("Failed to create first failure file");
-    f1.write(format!("//{}\n", name).as_bytes())
-        .expect("Failed to write first line");
-    f1.write_all(first.as_bytes())
-        .expect("failed to write to first failure file");
-    if let Some(ref second) = second {
-        let mut f2 = ::std::fs::File::create(dir.join(&format!("{}.second.js", name)))
-            .expect("Failed to create second failure file");
-        f2.write(format!("//{}\n", name).as_bytes())
-            .expect("Failed to write first line");
-        f2.write_all(second.as_bytes())
-            .expect("failed to write second failure file");
-    }
 }
