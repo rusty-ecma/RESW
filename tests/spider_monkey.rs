@@ -1,11 +1,12 @@
 #![cfg(all(test, feature = "moz_central"))]
-use ressa::{Error, Parser};
+use ressa::Parser;
 use resw::{write_str::WriteString, Writer};
 use std::path::Path;
 mod common;
 
 #[test]
 fn moz_central() {
+    pretty_env_logger::try_init().ok();
     let moz_central_path = Path::new("./moz-central");
     if !moz_central_path.exists() {
         panic!("Please download the spider monkey JIT Test files to run this test (see CONTRIBUTING.md)");
@@ -52,24 +53,26 @@ fn walk(path: &Path) -> Vec<String> {
                         }
                         Err(e) => {
                             let loc = match &e {
-                                Error::InvalidGetterParams(ref pos)
-                                | Error::InvalidSetterParams(ref pos)
-                                | Error::NonStrictFeatureInStrictContext(ref pos, _)
-                                | Error::OperationError(ref pos, _)
-                                | Error::Redecl(ref pos, _)
-                                | Error::UnableToReinterpret(ref pos, _, _)
-                                | Error::UnexpectedToken(ref pos, _) => {
+                                common::Error::Ressa(
+                                    ressa::Error::InvalidGetterParams(ref pos)
+                                    | ressa::Error::InvalidSetterParams(ref pos)
+                                    | ressa::Error::NonStrictFeatureInStrictContext(ref pos, _)
+                                    | ressa::Error::OperationError(ref pos, _)
+                                    | ressa::Error::Redecl(ref pos, _)
+                                    | ressa::Error::UnableToReinterpret(ref pos, _, _)
+                                    | ressa::Error::UnexpectedToken(ref pos, _),
+                                ) => {
                                     format!("{}:{}:{}", path.display(), pos.line, pos.column)
                                 }
                                 _ => format!("{}", path.display()),
                             };
+                            log::info!("Failed first pass for\n{}\n{}", loc, e);
                             if let Ok(op) =
                                 ::std::process::Command::new("./node_modules/.bin/esparse")
                                     .arg(path)
                                     .output()
                             {
                                 if op.status.success() {
-                                    // eprintln!("possible new whitelist item:\n\t{}", path.display());
                                     ret.push(format!(
                                         "1st pass failure parsed by esprima: {}\n\t{}",
                                         e, loc
@@ -87,7 +90,7 @@ fn walk(path: &Path) -> Vec<String> {
     ret
 }
 
-fn run(file: &Path) -> Result<Option<String>, Error> {
+fn run(file: &Path) -> Result<Option<String>, common::Error> {
     let contents = ::std::fs::read_to_string(file)?;
     if contents.starts_with("// |jit-test| error: SyntaxError")
         || contents.starts_with("|")
@@ -99,10 +102,15 @@ fn run(file: &Path) -> Result<Option<String>, Error> {
         return Ok(None); //these all contain restricted word import as an ident
     }
     let ret = around_once(&contents)?;
+    common::round_trip_validate(
+        &contents,
+        false,
+        file.file_stem().unwrap().to_str().unwrap(),
+    )?;
     Ok(Some(ret))
 }
 
-fn around_once(js: &str) -> Result<String, Error> {
+fn around_once(js: &str) -> Result<String, common::Error> {
     let mut out = WriteString::new();
     let mut writer = Writer::new(out.generate_child());
     for part in Parser::new(&js)? {
