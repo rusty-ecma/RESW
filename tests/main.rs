@@ -7,6 +7,7 @@ fn everything_js_es5() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es5.js")
         .expect("Failed to read js file");
+    common::round_trip_validate(&js, false, "everything.es5").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("everything.es5", &first, &second);
 }
@@ -16,6 +17,7 @@ fn everything_js_es2015_script() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es2015-script.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "everything.es2015-script").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("everything.es2015-script", &first, &second);
 }
@@ -25,6 +27,7 @@ fn everything_js_es2015_module() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/everything.js/es2015-module.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, true, "everything.es2015-module").unwrap();
     let (first, second) = common::double_round_trip(&js, true);
     check_round_trips("everything.es2015-module", &first, &second);
 }
@@ -34,6 +37,7 @@ fn jquery() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/jquery/dist/jquery.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "jquery").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("jquery", &first, &second);
 }
@@ -43,6 +47,7 @@ fn angular() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("./node_modules/angular/angular.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "angular").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("angular", &first, &second);
 }
@@ -52,6 +57,7 @@ fn react() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/react/cjs/react.development.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "react").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("react", &first, &second);
 }
@@ -60,6 +66,7 @@ fn react_dom() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/react-dom/cjs/react-dom.development.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "react_dom").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("react_dom", &first, &second);
 }
@@ -69,6 +76,7 @@ fn vue() {
     ensure_libraries();
     let js =
         ::std::fs::read_to_string("node_modules/vue/dist/vue.js").expect("failed to read js file");
+    common::round_trip_validate(&js, false, "vue").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("vue", &first, &second);
 }
@@ -78,6 +86,7 @@ fn dexie() {
     ensure_libraries();
     let js = ::std::fs::read_to_string("node_modules/dexie/dist/dexie.js")
         .expect("failed to read js file");
+    common::round_trip_validate(&js, false, "dexie").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("dexie", &first, &second);
 }
@@ -87,6 +96,7 @@ fn moment() {
     ensure_libraries();
     let js =
         ::std::fs::read_to_string("node_modules/moment/moment.js").expect("failed to read js file");
+    common::round_trip_validate(&js, false, "moment").unwrap();
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("moment", &first, &second);
 }
