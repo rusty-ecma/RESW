@@ -1136,7 +1136,7 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_ctor_property(&mut self, prop: &Prop) -> Res {
         trace!("write_ctor_property");
-        self.write("constructor")?;
+        self.write_property_key(&prop.key, false)?;
         if let PropValue::Expr(Expr::Func(ref func)) = prop.value {
             self.write_function_args(&func.params)?;
             self.write_function_body(&func.body)?;
