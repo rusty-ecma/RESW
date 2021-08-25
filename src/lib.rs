@@ -1098,10 +1098,13 @@ impl<T: Write> Writer<T> {
     }
     /// Write a single function arg
     pub fn write_function_arg(&mut self, arg: &FuncArg) -> Res {
-        trace!("write_function_arg");
+        trace!("write_function_arg: {:?}", arg);
         match arg {
-            FuncArg::Expr(ref ex) => self.write_expr(ex)?,
-            FuncArg::Pat(ref pa) => self.write_pattern(pa)?,
+            FuncArg::Expr(Expr::Assign(assignment)) => {
+                self.write_assignment_expr(assignment, false)?
+            }
+            FuncArg::Expr(ex) => self.write_expr(ex)?,
+            FuncArg::Pat(pa) => self.write_pattern(pa)?,
         }
         Ok(())
     }
@@ -1249,7 +1252,7 @@ impl<T: Write> Writer<T> {
             Expr::Binary(ref expr) => self.write_binary_expr(expr)?,
             Expr::Assign(ref expr) => {
                 self.at_top_level = false;
-                self.write_assignment_expr(expr)?
+                self.write_assignment_expr(expr, true)?
             }
             Expr::Logical(ref expr) => self.write_logical_expr(expr)?,
             Expr::Member(ref expr) => self.write_member_expr(expr)?,
@@ -1506,19 +1509,24 @@ impl<T: Write> Writer<T> {
     /// b += 8
     /// q **= 100
     /// ```
-    pub fn write_assignment_expr(&mut self, assignment: &AssignExpr) -> Res {
-        trace!("write_assignment_expr");
-        let wrap_self = match &assignment.left {
-            AssignLeft::Expr(ref e) => match &**e {
-                Expr::Obj(_) | Expr::Array(_) => true,
-                _ => false,
-            },
-            AssignLeft::Pat(ref p) => match p {
-                Pat::Array(_) => true,
-                Pat::Obj(_) => true,
-                _ => false,
-            },
-        };
+    pub fn write_assignment_expr(&mut self, assignment: &AssignExpr, should_wrap: bool) -> Res {
+        trace!(
+            "write_assignment_expr: {:?}, should_warp: {}",
+            assignment,
+            should_wrap
+        );
+        let wrap_self = should_wrap
+            && match &assignment.left {
+                AssignLeft::Expr(ref e) => match &**e {
+                    Expr::Obj(_) | Expr::Array(_) => true,
+                    _ => false,
+                },
+                AssignLeft::Pat(ref p) => match p {
+                    Pat::Array(_) => true,
+                    Pat::Obj(_) => true,
+                    _ => false,
+                },
+            };
         if wrap_self {
             self.write("(")?;
         }
@@ -1658,7 +1666,9 @@ impl<T: Write> Writer<T> {
     pub fn write_call_expr(&mut self, call: &CallExpr) -> Res {
         trace!("write_call_expr: {:?}", call);
         match &*call.callee {
-            Expr::Func(_) | Expr::ArrowFunc(_) => self.write_wrapped_expr(&call.callee)?,
+            Expr::Func(_) | Expr::ArrowFunc(_) | Expr::Conditional(_) | Expr::Logical(_) => {
+                self.write_wrapped_expr(&call.callee)?
+            }
             _ => self.write_expr(&call.callee)?,
         }
         self.write_sequence_expr(&call.arguments)?;
@@ -1672,8 +1682,12 @@ impl<T: Write> Writer<T> {
         trace!("write_new_expr: {:?}", new);
         self.write("new ")?;
         match &*new.callee {
-            Expr::Assign(_) | Expr::Call(_) | Expr::Conditional(_) => self.write_wrapped_expr(&new.callee)?,
-            Expr::Member(m) if matches!(&*m.object, Expr::Call(_)) => self.write_wrapped_expr(&new.callee)?,
+            Expr::Assign(_) | Expr::Call(_) | Expr::Conditional(_) => {
+                self.write_wrapped_expr(&new.callee)?
+            }
+            Expr::Member(m) if matches!(&*m.object, Expr::Call(_)) => {
+                self.write_wrapped_expr(&new.callee)?
+            }
             _ => self.write_expr(&new.callee)?,
         }
         self.write_sequence_expr(&new.arguments)?;
@@ -1716,7 +1730,7 @@ impl<T: Write> Writer<T> {
     /// }
     /// ```
     pub fn write_arrow_function_expr(&mut self, func: &ArrowFuncExpr) -> Res {
-        trace!("write_arrow_function_expr");
+        trace!("write_arrow_function_expr: {:?}", func);
         if func.is_async {
             self.write("async ")?;
         }

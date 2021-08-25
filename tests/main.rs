@@ -1,11 +1,6 @@
 #[cfg(feature = "moz_central")]
 extern crate rayon;
 mod common;
-#[cfg(feature = "moz_central")]
-mod spider_monkey;
-
-
-
 
 #[test]
 fn everything_js_es5() {
@@ -95,8 +90,6 @@ fn moment() {
     let (first, second) = common::double_round_trip(&js, false);
     check_round_trips("moment", &first, &second);
 }
-
-
 
 fn write_failure(name: &str, first: &str, second: &str) {
     use std::io::Write;
