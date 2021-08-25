@@ -38,3 +38,9 @@ fn for_in_init_in() {
     common::round_trip_validate(js, false, "for_in_init_in").unwrap();
 }
 
+#[test]
+fn if_zero_empty() {
+    pretty_env_logger::try_init().ok();
+    let js = r#"if(0);"#;
+    common::round_trip_validate(js, false, "if_zero_empty").unwrap();
+}

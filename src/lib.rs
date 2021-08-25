@@ -669,18 +669,10 @@ impl<T: Write> Writer<T> {
         self.write("if (")?;
         self.write_expr(&expr.test)?;
         self.write(") ")?;
-        if let Stmt::Empty = &*expr.consequent {
-            self.write_block_stmt(&[])?;
-        } else {
-            self.write_stmt(&expr.consequent)?;
-        }
+        self.write_stmt(&expr.consequent)?;
         if let Some(ref alt) = &expr.alternate {
             self.write(" else ")?;
-            if let Stmt::Empty = &**alt {
-                self.write_block_stmt(&[])?;
-            } else {
-                self.write_stmt(alt)?;
-            }
+            self.write_stmt(alt)?;
         }
         Ok(())
     }
