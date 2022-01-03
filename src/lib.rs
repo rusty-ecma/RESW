@@ -5,6 +5,7 @@ use resast::prelude::*;
 use ress::{prelude::Comment, tokens::CommentKind};
 use std::io::{Error as IoError, Write};
 pub mod write_str;
+pub mod spanned;
 
 /// The writer that will take in
 /// RESSA AST and write to the provided
@@ -348,37 +349,6 @@ impl<T: Write> Writer<T> {
 
             self.write_import_specificer(spec)?;
         }
-        // let mut specifiers = imp.specifiers.iter();
-        // if let Some(ref first) = specifiers.next() {
-        //     if let ImportSpecifier::Default(ref ident) = first {
-        //         self.write_ident(ident)?;
-        //     } else if let ImportSpecifier::Namespace(ref imp) = first {
-        //         self.write_namespace_import(imp)?;
-        //     } else {
-        //         self.write_import_specificer(first)?;
-        //     }
-        // }
-
-        // if !opened_brace {
-        //     if let Some(ref next) = specifiers.next() {
-        //         if let ImportSpecifier::Namespace(ref name) = next {
-        //             self.write(", ")?;
-        //             self.write_namespace_import(name)?;
-        //         } else {
-        //             self.write(", { ")?;
-        //             self.write_import_specificer(next)?;
-        //             opened_brace = true;
-        //         }
-        //     }
-        // }
-
-        // while let Some(ref s) = specifiers.next() {
-        //     self.write(", ")?;
-        //     self.write_import_specificer(s)?;
-        // }
-        // if opened_brace {
-        //     self.write(" }")?;
-        // }
         if imp.specifiers.len() != 0 {
             self.write(" from ")?;
         }
