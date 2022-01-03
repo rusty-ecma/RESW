@@ -79,8 +79,7 @@ fn new_member_expr_failure() {
 
 #[test]
 fn long_args_failure() {
-    let js = "
-function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
+    let js = "function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
 ";
     common::round_trip_validate(js, false, "long_args_failure").unwrap();
 }
@@ -95,4 +94,15 @@ fn new_callee_logical() {
 fn unary_call() {
     let js = "let a = (void 1)()";
     common::round_trip_validate(js, false, "unary_call").unwrap();
+}
+
+#[test]
+fn re_match_and_member() {
+    common::round_trip_validate("var selectAs =  / as /.test(match[0]) && match[1];", false, "re_match_and_member").unwrap();
+}
+
+#[test]
+fn regex() {
+    let js = "var x = / as /";
+    common::round_trip_validate(js, false, "regex").unwrap();
 }
