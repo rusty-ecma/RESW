@@ -4,8 +4,8 @@ use resast::prelude::*;
 
 use ress::{prelude::Comment, tokens::CommentKind};
 use std::io::{Error as IoError, Write};
-pub mod write_str;
 pub mod spanned;
+pub mod write_str;
 
 /// The writer that will take in
 /// RESSA AST and write to the provided
@@ -338,7 +338,7 @@ impl<T: Write> Writer<T> {
     pub fn write_import_decl(&mut self, imp: &ModImport) -> Res {
         trace!("write_import_decl");
         self.write("import ")?;
-        
+
         let mut past_first = false;
         for spec in &imp.specifiers {
             if past_first {

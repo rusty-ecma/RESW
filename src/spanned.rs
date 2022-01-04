@@ -1,24 +1,51 @@
-use std::{io::Write};
-use resast::{spanned::{
-    Ident,
-    Slice, Position, Program, ProgramPart, Dir, expr::{Lit, Expr, Prop, PropInit, PropInitKey, PropKey, PropValue, PropMethod, PropCtor, PropGet, PropSet, ArrayExpr, ArrowFuncExpr, ArrowFuncBody, AssignExpr, AssignLeft, AwaitExpr, BinaryExpr, CallExpr, ConditionalExpr, LogicalExpr, MemberExpr, MemberIndexer, MetaProp, NewExpr, ObjExpr, ObjProp, TaggedTemplateExpr, TemplateLit, UnaryExpr, UpdateExpr, YieldExpr}, decl::{Decl, VarDecl, VarDecls, ModImport, ModExport, ImportSpecifier, NormalImportSpec, NormalImportSpecs, DefaultImportSpec, NamespaceImportSpec, ExportSpecifier, ModExportSpecifier, DefaultExportDeclValue, NamedExportDecl, NamedExportSpec, ExportList, NamedExportSource}, VarKind, ListEntry, pat::{Pat, ObjPat, ObjPatPart, RestPat, ArrayPat, ArrayPatPart, AssignPat}, Func, FuncArg, FuncBody, Class, ClassBody, stmt::{Stmt, IfStmt, SwitchStmt, SwitchCase, self, CatchClause, FinallyClause, WhileStmt, DoWhileStmt, ForStmt, LoopInit, ForInStmt, LoopLeft, ForOfStmt}, AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp}};
+use resast::spanned::{
+    decl::{
+        Decl, DefaultExportDeclValue, DefaultImportSpec, ExportList, ExportSpecifier,
+        ImportSpecifier, ModExport, ModExportSpecifier, ModImport, NamedExportDecl,
+        NamedExportSource, NamedExportSpec, NamespaceImportSpec, NormalImportSpec,
+        NormalImportSpecs, VarDecl, VarDecls,
+    },
+    expr::{
+        ArrayExpr, ArrowFuncBody, ArrowFuncExpr, AssignExpr, AssignLeft, AwaitExpr, BinaryExpr,
+        CallExpr, ConditionalExpr, Expr, Lit, LogicalExpr, MemberExpr, MemberIndexer, MetaProp,
+        NewExpr, ObjExpr, ObjProp, Prop, PropCtor, PropGet, PropInit, PropInitKey, PropKey,
+        PropMethod, PropSet, PropValue, TaggedTemplateExpr, TemplateLit, UnaryExpr, UpdateExpr,
+        YieldExpr,
+    },
+    pat::{ArrayPat, ArrayPatPart, AssignPat, ObjPat, ObjPatPart, Pat, RestPat},
+    stmt::{
+        self, CatchClause, DoWhileStmt, FinallyClause, ForInStmt, ForOfStmt, ForStmt, IfStmt,
+        LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt, WhileStmt,
+    },
+    AssignOp, BinaryOp, Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry,
+    LogicalOp, Position, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind,
+};
 use ress::tokens::{Comment, CommentKind};
+use std::io::Write;
 
 type Res = Result<(), std::io::Error>;
 
 pub struct SpannedWriter<T> {
     out: T,
     last_out: Position,
-    last_slice: Slice<'static>
+    last_slice: Slice<'static>,
 }
 
 impl<T> SpannedWriter<T>
-where T: Write {
+where
+    T: Write,
+{
     pub fn new(out: T) -> Self {
         Self {
             out,
             last_out: Position { line: 0, column: 0 },
-            last_slice: Slice { source: std::borrow::Cow::Owned(String::new()), loc: resast::spanned::SourceLocation { start: Position { line: 0, column: 0 }, end: Position { line: 0, column: 0 }}}
+            last_slice: Slice {
+                source: std::borrow::Cow::Owned(String::new()),
+                loc: resast::spanned::SourceLocation {
+                    start: Position { line: 0, column: 0 },
+                    end: Position { line: 0, column: 0 },
+                },
+            },
         }
     }
 
@@ -56,17 +83,17 @@ where T: Write {
                     self.write_slice(semi)?;
                 }
                 Ok(())
-            },
+            }
             Decl::Func(func) => self.write_func(func),
             Decl::Class(class) => self.write_class(class),
             Decl::Import { import, semi_colon } => {
                 self.write_mod_import(import)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Decl::Export { export, semi_colon } => {
                 self.write_mod_export(export)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
         }
     }
 
@@ -130,13 +157,17 @@ where T: Write {
             ModExportSpecifier::Default { keyword, value } => {
                 self.write_slice(keyword)?;
                 self.write_default_export_value(value)
-            },
+            }
             ModExportSpecifier::Named(named) => self.write_named_export_decl(named),
-            ModExportSpecifier::All { star, keyword, name } => {
+            ModExportSpecifier::All {
+                star,
+                keyword,
+                name,
+            } => {
                 self.write_slice(star)?;
                 self.write_slice(keyword)?;
                 self.write_lit(name)
-            },
+            }
         }
     }
 
@@ -161,7 +192,7 @@ where T: Write {
         }
         Ok(())
     }
-    
+
     pub fn write_export_list(&mut self, list: &ExportList) -> Res {
         self.write_slice(&list.open_brace)?;
         for spec in &list.elements {
@@ -190,58 +221,76 @@ where T: Write {
             Stmt::Expr { expr, semi_colon } => {
                 self.write_expr(expr)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Stmt::Block(block) => {
                 self.write_slice(&block.open_brace)?;
                 self.write_parts(&block.stmts)?;
                 self.write_slice(&block.close_brace)
-
-            },
+            }
             Stmt::Empty(slice) => self.write_slice(slice),
-            Stmt::Debugger { keyword, semi_colon } => {
+            Stmt::Debugger {
+                keyword,
+                semi_colon,
+            } => {
                 self.write_slice(keyword)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Stmt::With(with) => {
                 self.write_slice(&with.keyword)?;
                 self.write_slice(&with.open_paren)?;
                 self.write_expr(&with.object)?;
                 self.write_slice(&with.close_paren)?;
                 self.write_stmt(&with.body)
-            },
-            Stmt::Return { keyword, value, semi_colon } => {
+            }
+            Stmt::Return {
+                keyword,
+                value,
+                semi_colon,
+            } => {
                 self.write_slice(keyword)?;
                 if let Some(value) = value {
                     self.write_expr(value)?;
                 }
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Stmt::Labeled(labeled) => {
                 self.write_ident(&labeled.label)?;
                 self.write_slice(&labeled.colon)?;
                 self.write_stmt(&labeled.body)
-            },
-            Stmt::Break { keyword, label, semi_colon } => {
+            }
+            Stmt::Break {
+                keyword,
+                label,
+                semi_colon,
+            } => {
                 self.write_slice(keyword)?;
                 if let Some(label) = label {
                     self.write_ident(label)?;
                 }
                 self.write_maybe_slice(semi_colon)
-            },
-            Stmt::Continue { keyword, label, semi_colon } => {
+            }
+            Stmt::Continue {
+                keyword,
+                label,
+                semi_colon,
+            } => {
                 self.write_slice(keyword)?;
                 if let Some(label) = label {
                     self.write_ident(label)?;
                 }
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Stmt::If(stmt) => self.write_if_stmt(stmt),
             Stmt::Switch(switch) => self.write_switch_stmt(switch),
-            Stmt::Throw { keyword, expr, semi_colon } => {
+            Stmt::Throw {
+                keyword,
+                expr,
+                semi_colon,
+            } => {
                 self.write_slice(keyword)?;
                 self.write_expr(expr)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
             Stmt::Try(try_stmt) => self.write_try_stmt(try_stmt),
             Stmt::While(while_stmt) => self.write_while_stmt(while_stmt),
             Stmt::DoWhile(do_while) => self.write_do_while(do_while),
@@ -251,7 +300,7 @@ where T: Write {
             Stmt::Var { decls, semi_colon } => {
                 self.write_var_decls(decls)?;
                 self.write_maybe_slice(semi_colon)
-            },
+            }
         }
     }
 
@@ -265,7 +314,7 @@ where T: Write {
             VarKind::Var(Some(slice)) => self.write_slice(slice),
             VarKind::Let(slice) => self.write_slice(slice),
             VarKind::Const(slice) => self.write_slice(slice),
-            _ => Ok(())
+            _ => Ok(()),
         }
     }
 
@@ -402,7 +451,7 @@ where T: Write {
             LoopInit::Variable(kind, decls) => {
                 self.write_var_kind(kind)?;
                 self.write_var_decls_(decls)
-            },
+            }
             LoopInit::Expr(expr) => self.write_expr(expr),
         }
     }
@@ -433,7 +482,7 @@ where T: Write {
             LoopLeft::Variable(kind, decl) => {
                 self.write_var_kind(kind)?;
                 self.write_var_decl(decl)
-            },
+            }
             LoopLeft::Pat(pat) => self.write_pat(pat),
         }
     }
@@ -580,7 +629,7 @@ where T: Write {
             FuncArg::Rest(rest) => {
                 self.write_slice(&rest.dots)?;
                 self.write_pat(&rest.pat)
-            },
+            }
         }
     }
 
@@ -653,12 +702,14 @@ where T: Write {
         self.write_slice(&rest.dots)?;
         self.write_pat(&rest.pat)
     }
-    
+
     pub fn write_expr(&mut self, expr: &Expr) -> Res {
         match expr {
             Expr::Array(arr) => self.write_arr_expr(arr),
             Expr::ArrowFunc(arrow) => self.write_arrow_func(arrow),
-            Expr::ArrowParamPlaceHolder(apph) => panic!("Write arrow parameter_place_holder...: {:?}", apph),
+            Expr::ArrowParamPlaceHolder(apph) => {
+                panic!("Write arrow parameter_place_holder...: {:?}", apph)
+            }
             Expr::Assign(assign) => self.write_assign_expr(assign),
             Expr::Await(await_expr) => self.write_await_expr(await_expr),
             Expr::Binary(bin) => self.write_bin_expr(bin),
@@ -677,7 +728,7 @@ where T: Write {
             Expr::Spread(spread) => {
                 self.write_slice(&spread.dots)?;
                 self.write_expr(&spread.expr)
-            },
+            }
             Expr::Super(slice) => self.write_slice(&slice),
             Expr::TaggedTemplate(temp) => self.write_tagged_template_expr(temp),
             Expr::This(slice) => self.write_slice(slice),
@@ -687,7 +738,7 @@ where T: Write {
                 self.write_slice(&wrapped.open_paren)?;
                 self.write_expr(&wrapped.expr)?;
                 self.write_slice(&wrapped.close_paren)
-            },
+            }
             Expr::Yield(expr) => self.write_yield_expr(expr),
         }
     }
@@ -813,12 +864,15 @@ where T: Write {
             MemberIndexer::Period(period) => {
                 self.write_slice(period)?;
                 self.write_expr(&member.property)
-            },
-            MemberIndexer::Computed { open_bracket, close_bracket } => {
+            }
+            MemberIndexer::Computed {
+                open_bracket,
+                close_bracket,
+            } => {
                 self.write_slice(open_bracket)?;
                 self.write_expr(&member.property)?;
                 self.write_slice(close_bracket)
-            },
+            }
         }
     }
 
@@ -849,7 +903,7 @@ where T: Write {
                 ObjProp::Spread(spread) => {
                     self.write_slice(&spread.dots)?;
                     self.write_expr(&spread.expr)?;
-                },
+                }
             }
             self.write_maybe_slice(&prop.comma)?;
         }
@@ -860,7 +914,7 @@ where T: Write {
         self.write_expr(&temp.tag)?;
         self.write_template_lit(&temp.quasi)
     }
-    
+
     pub fn write_unary_expr(&mut self, unary: &UnaryExpr) -> Res {
         if unary.prefix() {
             self.write_unary_op(&unary.operator)?;
@@ -907,7 +961,7 @@ where T: Write {
         }
         Ok(())
     }
-    
+
     pub fn write_maybe_slice(&mut self, slice: &Option<Slice>) -> Res {
         if let Some(slice) = slice.as_ref() {
             self.write_slice(slice)?;
@@ -922,7 +976,7 @@ where T: Write {
                 self.write_slice(&s.open_quote)?;
                 self.write_slice(&s.content)?;
                 self.write_slice(&s.close_quote)
-            },
+            }
             Lit::Number(slice) => self.write_slice(slice),
             Lit::Boolean(slice) => self.write_slice(slice),
             Lit::RegEx(re) => {
@@ -933,7 +987,7 @@ where T: Write {
                     self.write_slice(flags)?;
                 }
                 Ok(())
-            },
+            }
             Lit::Template(temp) => self.write_template_lit(temp),
         }
     }
@@ -974,13 +1028,13 @@ where T: Write {
     pub fn write_ident(&mut self, ident: &Ident) -> Res {
         self.write_slice(&ident.slice)
     }
-    
+
     fn write_slice(&mut self, slice: &Slice) -> Res {
         eprintln!("write_slice: {:?}", slice.source);
         if self.last_out.line == 0 {
             self.write(&slice.source)?;
             self.last_out = slice.loc.end;
-            return Ok(())
+            return Ok(());
         }
         let new_lines = slice.loc.start.line - self.last_out.line;
         self.write(&"\n".repeat(new_lines))?;
@@ -997,7 +1051,7 @@ where T: Write {
         let last_slice_source = slice.source.clone().into_owned();
         self.last_slice = Slice {
             loc: slice.loc,
-            source: std::borrow::Cow::Owned(last_slice_source)
+            source: std::borrow::Cow::Owned(last_slice_source),
         };
         self.write(&slice.source)?;
         Ok(())

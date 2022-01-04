@@ -13,7 +13,7 @@ pub enum Error {
     #[error("Mismatched parts:\n{left}\n{right}")]
     Mismatched { left: String, right: String },
     #[error("paniced while parsing: {0}")]
-    Panic(String)
+    Panic(String),
 }
 
 pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
@@ -112,8 +112,8 @@ pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Re
     Ok(())
 }
 pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
-    use ressa::spanned::Parser;
     use resast::spanned::Program;
+    use ressa::spanned::Parser;
     use resw::spanned::SpannedWriter as Writer;
     let write_failures = std::env::var("RESW_WRITE_FAILURES") == Ok("1".to_string());
     let mut first_parser = Parser::builder().js(js).module(module).build()?;
@@ -131,43 +131,42 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
     let res = std::panic::catch_unwind({
         let second_js = second_js.clone();
         move || {
-        let res = second_parser.parse();
-        let second_parts = match res {
-            Ok(prog) => match prog {
-                Program::Mod(parts) => parts,
-                Program::Script(parts) => parts,
-            },
-            Err(e) => {
-                if write_failures {
-                    write_failure(name, &second_js, &None);
+            let res = second_parser.parse();
+            let second_parts = match res {
+                Ok(prog) => match prog {
+                    Program::Mod(parts) => parts,
+                    Program::Script(parts) => parts,
+                },
+                Err(e) => {
+                    if write_failures {
+                        write_failure(name, &second_js, &None);
+                    }
+                    return Err(Error::Ressa(e));
                 }
-                return Err(Error::Ressa(e));
+            };
+            if first_parts != second_parts {
+                let ret = find_mismatched(first_parts, second_parts).unwrap();
+
+                if write_failures {
+                    let to_write = if let Error::Mismatched { left, right } = &ret {
+                        format!("//{}\n//{}\n\n{}", left, right, second_js)
+                    } else {
+                        second_js
+                    };
+                    write_failure(&format!("{}-spanned", name), &to_write, &None);
+                }
+                return Err(ret);
             }
-        };
-        if first_parts != second_parts {
-            let ret = find_mismatched(
-                first_parts,
-                second_parts
-            ).unwrap();
-    
-            if write_failures {
-                let to_write = if let Error::Mismatched { left, right } = &ret {
-                    format!("//{}\n//{}\n\n{}", left, right, second_js)
-                } else {
-                    second_js
-                };
-                write_failure(&format!("{}-spanned", name), &to_write, &None);
-            }
-            return Err(ret);
+            Ok(())
         }
-        Ok(())
-    }}).map_err(|e| {
+    })
+    .map_err(|e| {
         let msg = if let Some(x) = e.downcast_ref::<&dyn std::fmt::Debug>() {
             format!("{:?}", x)
         } else {
             "Panicked while parsing...".to_string()
         };
-        eprintln!("panic: {}",msg);
+        eprintln!("panic: {}", msg);
         Error::Panic(msg)
     })?;
     if let Err(e) = res {
@@ -179,11 +178,10 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
     Ok(())
 }
 
-pub fn find_mismatched<T>(
-    first_parts: Vec<T>,
-    second_parts: Vec<T>,
-) -> Option<Error> 
-where T: PartialEq + std::fmt::Debug {
+pub fn find_mismatched<T>(first_parts: Vec<T>, second_parts: Vec<T>) -> Option<Error>
+where
+    T: PartialEq + std::fmt::Debug,
+{
     for (lhs, rhs) in first_parts.into_iter().zip(second_parts.into_iter()) {
         if lhs != rhs {
             return Some(Error::Mismatched {
