@@ -79,8 +79,7 @@ fn new_member_expr_failure() {
 
 #[test]
 fn long_args_failure() {
-    let js = "
-function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
+    let js = "function f(a, b = 0, [c,, d = 0, ...e], {f, g: h, i = 0, i: j = 0}, ...k){}
 ";
     common::round_trip_validate(js, false, "long_args_failure").unwrap();
 }

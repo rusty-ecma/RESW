@@ -18,7 +18,7 @@ use resast::spanned::{
         LoopInit, LoopLeft, Stmt, SwitchCase, SwitchStmt, WhileStmt,
     },
     AssignOp, BinaryOp, Class, ClassBody, Dir, Func, FuncArg, FuncBody, Ident, ListEntry,
-    LogicalOp, Position, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind,
+    LogicalOp, Node, Position, Program, ProgramPart, Slice, UnaryOp, UpdateOp, VarKind,
 };
 use ress::tokens::{Comment, CommentKind};
 use std::io::Write;
@@ -517,6 +517,14 @@ where
             self.write_slice(colon)?;
         }
         if let Some(init) = &prop_init.value {
+            // special case for `{ i = 0 }`
+            if let PropValue::Pat(Pat::Assign(assign)) = init {
+                if assign.left.loc() == prop_init.key.loc() {
+                    self.write_assign_op(&assign.operator)?;
+                    self.write_expr(&assign.right)?;
+                    return Ok(());
+                }
+            }
             self.write_prop_value(init)?;
         }
         Ok(())
@@ -768,6 +776,7 @@ where
         if let Some(close) = &arrow.close_paren {
             self.write_slice(close)?;
         }
+        self.write_slice(&arrow.arrow)?;
         match &arrow.body {
             ArrowFuncBody::FuncBody(body) => self.write_func_body(body),
             ArrowFuncBody::Expr(expr) => self.write_expr(expr),
