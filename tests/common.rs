@@ -97,7 +97,7 @@ pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Re
         }
     };
     if first_parts != second_parts {
-        let ret = find_mismatched(first_parts, second_parts).unwrap();
+        let ret = find_mismatched(&first_parts, &second_parts).unwrap();
 
         if write_failures {
             let to_write = if let Error::Mismatched { left, right } = &ret {
@@ -145,15 +145,18 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
                 }
             };
             if first_parts != second_parts {
-                let ret = find_mismatched(first_parts, second_parts).unwrap();
-
+                let ret = find_mismatched(&first_parts, &second_parts).unwrap();
+                
                 if write_failures {
                     let to_write = if let Error::Mismatched { left, right } = &ret {
                         format!("//{}\n//{}\n\n{}", left, right, second_js)
                     } else {
                         second_js
                     };
-                    write_failure(&format!("{}-spanned", name), &to_write, &None);
+                    let name = format!("{}-spanned", name);
+                    write_failure(&name, &to_write, &None);
+                    write_file(&format!("{:#?}", first_parts), &format!("{}.1.ron", name));
+                    write_file(&format!("{:#?}", second_parts), &format!("{}.2.ron", name));
                 }
                 return Err(ret);
             }
@@ -178,7 +181,7 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
     Ok(())
 }
 
-pub fn find_mismatched<T>(first_parts: Vec<T>, second_parts: Vec<T>) -> Option<Error>
+pub fn find_mismatched<T>(first_parts: &[T], second_parts: &[T]) -> Option<Error>
 where
     T: PartialEq + std::fmt::Debug,
 {
@@ -203,23 +206,17 @@ pub fn parse<'a>(
 }
 
 pub fn write_failure(name: &str, first: &str, second: &Option<String>) {
-    use std::io::Write;
+    write_file(first, &format!("{}.first.js", name));
+    if let Some(ref second) = second {
+        write_file(second, &format!("{}.second.js", name));
+    }
+}
+
+fn write_file(content: &str, file_name: &str) {
     let dir = ::std::path::PathBuf::from("test_failures");
     if !dir.exists() {
         ::std::fs::create_dir(&dir).expect("failed to create test_failures");
     }
-    let mut f1 = ::std::fs::File::create(dir.join(&format!("{}.first.js", name)))
-        .expect("Failed to create first failure file");
-    f1.write(format!("//{}\n", name).as_bytes())
-        .expect("Failed to write first line");
-    f1.write_all(first.as_bytes())
-        .expect("failed to write to first failure file");
-    if let Some(ref second) = second {
-        let mut f2 = ::std::fs::File::create(dir.join(&format!("{}.second.js", name)))
-            .expect("Failed to create second failure file");
-        f2.write(format!("//{}\n", name).as_bytes())
-            .expect("Failed to write first line");
-        f2.write_all(second.as_bytes())
-            .expect("failed to write second failure file");
-    }
+    let path = dir.join(file_name);
+    std::fs::write(path, content).unwrap();
 }

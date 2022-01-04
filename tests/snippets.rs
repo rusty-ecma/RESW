@@ -95,3 +95,8 @@ fn unary_call() {
     let js = "let a = (void 1)()";
     common::round_trip_validate(js, false, "unary_call").unwrap();
 }
+
+#[test]
+fn re_match_and_member() {
+    common::round_trip_validate("var selectAs =  / as /.test(match[0]) && match[1];", false, "re_match_and_member").unwrap();
+}

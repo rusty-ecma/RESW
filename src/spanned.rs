@@ -28,7 +28,6 @@ type Res = Result<(), std::io::Error>;
 pub struct SpannedWriter<T> {
     out: T,
     last_out: Position,
-    last_slice: Slice<'static>,
 }
 
 impl<T> SpannedWriter<T>
@@ -38,14 +37,7 @@ where
     pub fn new(out: T) -> Self {
         Self {
             out,
-            last_out: Position { line: 0, column: 0 },
-            last_slice: Slice {
-                source: std::borrow::Cow::Owned(String::new()),
-                loc: resast::spanned::SourceLocation {
-                    start: Position { line: 0, column: 0 },
-                    end: Position { line: 0, column: 0 },
-                },
-            },
+            last_out: Position { line: 1, column: 1 },
         }
     }
 
@@ -72,7 +64,8 @@ where
     }
 
     pub fn write_dir(&mut self, dir: &Dir) -> Res {
-        self.write_lit(&dir.expr)
+        self.write_lit(&dir.expr)?;
+        self.write_maybe_slice(&dir.semi_colon)
     }
 
     pub fn write_decl(&mut self, decl: &Decl) -> Res {
@@ -1039,29 +1032,15 @@ where
     }
 
     fn write_slice(&mut self, slice: &Slice) -> Res {
-        eprintln!("write_slice: {:?}", slice.source);
-        if self.last_out.line == 0 {
-            self.write(&slice.source)?;
-            self.last_out = slice.loc.end;
-            return Ok(());
-        }
         let new_lines = slice.loc.start.line - self.last_out.line;
         self.write(&"\n".repeat(new_lines))?;
         let leading = if new_lines == 0 {
-            if slice.loc.start.column < self.last_out.column {
-                eprintln!("{:?}\n{:?}", self.last_slice, slice);
-            }
             " ".repeat(slice.loc.start.column - self.last_out.column)
         } else {
             " ".repeat(slice.loc.start.column.saturating_sub(1))
         };
         self.write(&leading)?;
         self.last_out = slice.loc.end;
-        let last_slice_source = slice.source.clone().into_owned();
-        self.last_slice = Slice {
-            loc: slice.loc,
-            source: std::borrow::Cow::Owned(last_slice_source),
-        };
         self.write(&slice.source)?;
         Ok(())
     }
