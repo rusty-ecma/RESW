@@ -100,3 +100,9 @@ fn unary_call() {
 fn re_match_and_member() {
     common::round_trip_validate("var selectAs =  / as /.test(match[0]) && match[1];", false, "re_match_and_member").unwrap();
 }
+
+#[test]
+fn regex() {
+    let js = "var x = / as /";
+    common::round_trip_validate(js, false, "regex").unwrap();
+}

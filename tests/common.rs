@@ -73,6 +73,7 @@ pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
 }
 
 pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
+    pretty_env_logger::try_init().ok();
     round_trip_validate_bare(js, module, name)?;
     round_trip_validate_spanned(js, module, name)
 }
