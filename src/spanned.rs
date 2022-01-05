@@ -116,7 +116,8 @@ where
     pub fn write_normal_import_specs(&mut self, specs: &NormalImportSpecs) -> Res {
         self.write_slice(&specs.open_brace)?;
         for spec in &specs.specs {
-            self.write_normal_import_spec(&spec)?;
+            self.write_normal_import_spec(&spec.item)?;
+            self.write_maybe_slice(&spec.comma)?;
         }
         self.write_slice(&specs.close_brace)
     }
