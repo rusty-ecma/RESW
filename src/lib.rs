@@ -1178,6 +1178,7 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_rest_pattern_part(&mut self, pat: &Pat) -> Res {
         trace!("write_rest_pattern_part");
+        self.write("...")?;
         self.write_pattern(pat)?;
         Ok(())
     }
