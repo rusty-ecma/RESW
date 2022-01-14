@@ -98,11 +98,34 @@ fn unary_call() {
 
 #[test]
 fn re_match_and_member() {
-    common::round_trip_validate("var selectAs =  / as /.test(match[0]) && match[1];", false, "re_match_and_member").unwrap();
+    common::round_trip_validate(
+        "var selectAs =  / as /.test(match[0]) && match[1];",
+        false,
+        "re_match_and_member",
+    )
+    .unwrap();
 }
 
 #[test]
 fn regex() {
     let js = "var x = / as /";
     common::round_trip_validate(js, false, "regex").unwrap();
+}
+
+#[test]
+fn rest_params() {
+    let js = "function a(b, c, ...d) {}";
+    common::round_trip_validate(js, false, "rest_params").unwrap();
+}
+
+#[test]
+fn rest_arg() {
+    let js = "Math.max(...a)";
+    common::round_trip_validate(js, false, "rest_arg").unwrap();
+}
+
+#[test]
+fn rest_param_obj() {
+    let js = "function a({...b}) {}";
+    common::round_trip_validate(js, false, "rest_param_obj").unwrap();
 }

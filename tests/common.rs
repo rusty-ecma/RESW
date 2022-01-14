@@ -79,6 +79,7 @@ pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &str) -> Result<
 }
 pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
     let write_failures = std::env::var("RESW_WRITE_FAILURES") == Ok("1".to_string());
+    let write_success = std::env::var("RESW_WRITE_SUCCESS") == Ok("1".to_string());
     let mut first_parser = Parser::builder().js(js).module(module).build()?;
     let first_parts = parse(&mut first_parser)?;
     let mut write_string = WriteString::new();
@@ -109,6 +110,9 @@ pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Re
             write_failure(name, &to_write, &None);
         }
         return Err(ret);
+    }
+    if write_success {
+        write_failure(name, &second_js, &None);
     }
     Ok(())
 }
@@ -147,7 +151,7 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
             };
             if first_parts != second_parts {
                 let ret = find_mismatched(&first_parts, &second_parts).unwrap();
-                
+
                 if write_failures {
                     let to_write = if let Error::Mismatched { left, right } = &ret {
                         format!("//{}\n//{}\n\n{}", left, right, second_js)
