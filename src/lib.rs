@@ -1341,7 +1341,10 @@ impl<T: Write> Writer<T> {
             }
             match prop {
                 ObjProp::Prop(ref p) => self.write_property(p),
-                ObjProp::Spread(ref e) => self.write_expr(e),
+                ObjProp::Spread(ref e) => {
+                    self.write("...")?;
+                    self.write_expr(e)
+                }
             }?;
         }
         self.write("}")?;
