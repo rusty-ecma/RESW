@@ -129,3 +129,9 @@ fn rest_param_obj() {
     let js = "function a({...b}) {}";
     common::round_trip_validate(js, false, "rest_param_obj").unwrap();
 }
+
+#[test]
+fn assign_spread() {
+    let js = "let x = { ...y };";
+    common::round_trip_validate(js, false, "assign_spread").unwrap();
+}
