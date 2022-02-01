@@ -135,3 +135,14 @@ fn assign_spread() {
     let js = "let x = { ...y };";
     common::round_trip_validate(js, false, "assign_spread").unwrap();
 }
+
+
+#[test]
+fn double_break_in_switch_case() {
+    let js = "switch(0) {
+        case:
+          break;
+          break;
+        default: return;
+    }";
+}
