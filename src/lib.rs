@@ -718,19 +718,12 @@ impl<T: Write> Writer<T> {
         }
         self.write(":")?;
         self.write_new_line()?;
-        self.current_indent += 1;
-        let mut decrease_indent = true;
+        self.increment_indent();
         for ref part in &case.consequent {
-            if let ProgramPart::Stmt(Stmt::Break(_)) = part {
-                self.current_indent = self.current_indent.saturating_sub(1);
-                decrease_indent = false;
-            }
             self._write_part(part)?;
             self.write_new_line()?;
         }
-        if decrease_indent {
-            self.current_indent = self.current_indent.saturating_sub(1);
-        }
+        self.decrement_indent();
         Ok(())
     }
     /// Attempts to write a throw statement
@@ -1911,13 +1904,13 @@ impl<T: Write> Writer<T> {
     pub fn write_open_brace(&mut self) -> Res {
         trace!("write_open_brace");
         self.write("{")?;
-        self.current_indent += 1;
+        self.increment_indent();
         Ok(())
     }
 
     pub fn write_close_brace(&mut self) -> Res {
         trace!("write_close_brace");
-        self.current_indent -= 1;
+        self.decrement_indent();
         self.write_leading_whitespace()?;
         self.write("}")?;
         Ok(())
@@ -1958,6 +1951,16 @@ impl<T: Write> Writer<T> {
             CommentKind::Hashbang => self.write(&format!("#! {}", comment.content))?,
         }
         Ok(())
+    }
+
+    pub fn increment_indent(&mut self) {
+        log::trace!("increment_indent: {} -> {}", self.current_indent, self.current_indent.saturating_add(1));
+        self.current_indent += 1;
+    }
+    
+    pub fn decrement_indent(&mut self) {
+        log::trace!("decrement_indent: {} -> {}", self.current_indent, self.current_indent.saturating_sub(1));
+        self.current_indent -= 1;
     }
 }
 
