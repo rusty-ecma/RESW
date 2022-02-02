@@ -160,4 +160,5 @@ fn double_break_in_switch_case() {
           break;
         default: return;
     }";
+    common::round_trip_validate(js, false, "double_break_in_switch_case").unwrap();
 }
