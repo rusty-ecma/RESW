@@ -1639,13 +1639,13 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_conditional_expr(&mut self, conditional: &ConditionalExpr) -> Res {
         trace!("write_conditional_expr: {:?}", conditional);
-        if let Expr::Conditional(_) = &*conditional.test {
-            self.write_wrapped_expr(&conditional.test)?;
-        } else {
-            self.write_expr(&conditional.test)?;
+        match &*conditional.test {
+            Expr::Conditional(_) | Expr::Assign(_) => self.write_wrapped_expr(&conditional.test)?,
+            _ => self.write_expr(&conditional.test)?,
         }
         self.write(" ? ")?;
         if let Expr::Logical(_) = &*conditional.consequent {
+            log::debug!("logical consequent: {:?}", conditional.consequent);
             self.write_wrapped_expr(&conditional.consequent)?;
         } else {
             self.write_expr(&conditional.consequent)?;
