@@ -1954,12 +1954,20 @@ impl<T: Write> Writer<T> {
     }
 
     pub fn increment_indent(&mut self) {
-        log::trace!("increment_indent: {} -> {}", self.current_indent, self.current_indent.saturating_add(1));
+        log::trace!(
+            "increment_indent: {} -> {}",
+            self.current_indent,
+            self.current_indent.saturating_add(1)
+        );
         self.current_indent += 1;
     }
-    
+
     pub fn decrement_indent(&mut self) {
-        log::trace!("decrement_indent: {} -> {}", self.current_indent, self.current_indent.saturating_sub(1));
+        log::trace!(
+            "decrement_indent: {} -> {}",
+            self.current_indent,
+            self.current_indent.saturating_sub(1)
+        );
         self.current_indent -= 1;
     }
 }
