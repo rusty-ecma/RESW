@@ -155,10 +155,10 @@ fn assign_spread() {
 #[test]
 fn double_break_in_switch_case() {
     let js = "switch(0) {
-        case:
+        case 0:
           break;
           break;
-        default: return;
+        default: {}
     }";
     common::round_trip_validate(js, false, "double_break_in_switch_case").unwrap();
 }
