@@ -12,12 +12,28 @@ fn new_call_member() {
     let js = "new (c(d).e)();";
     common::round_trip_validate(js, false, "new_call_member").unwrap();
 }
+
 #[test]
 fn call_conditional() {
     pretty_env_logger::try_init().ok();
     let js = "(a ? b : c)();";
     common::round_trip_validate(js, false, "call_conditional").unwrap();
 }
+
+#[test]
+fn assign_conditional() {
+    pretty_env_logger::try_init().ok();
+    let js = "let a = (b = c) ? d : e;";
+    common::round_trip_validate(js, false, "assign_conditional").unwrap();
+}
+
+#[test]
+fn conditional_logical() {
+    pretty_env_logger::try_init().ok();
+    let js = "let a = (b = c) ? d && e : f == g;";
+    common::round_trip_validate(js, false, "conditional_logical").unwrap();
+}
+
 #[test]
 fn call_logical() {
     pretty_env_logger::try_init().ok();
@@ -135,7 +151,6 @@ fn assign_spread() {
     let js = "let x = { ...y };";
     common::round_trip_validate(js, false, "assign_spread").unwrap();
 }
-
 
 #[test]
 fn double_break_in_switch_case() {
