@@ -4,6 +4,7 @@ use resast::prelude::*;
 
 use ress::{prelude::Comment, tokens::CommentKind};
 use std::io::{Error as IoError, Write};
+pub mod spanned;
 pub mod write_str;
 
 /// The writer that will take in
@@ -337,44 +338,20 @@ impl<T: Write> Writer<T> {
     pub fn write_import_decl(&mut self, imp: &ModImport) -> Res {
         trace!("write_import_decl");
         self.write("import ")?;
-        if imp.specifiers.len() == 0 {
-            self.write("{}")?;
-        }
-        let mut opened_brace = false;
-        let mut specifiers = imp.specifiers.iter();
-        if let Some(ref first) = specifiers.next() {
-            if let ImportSpecifier::Default(ref ident) = first {
-                self.write_ident(ident)?;
-            } else if let ImportSpecifier::Namespace(ref imp) = first {
-                self.write_namespace_import(imp)?;
+
+        let mut past_first = false;
+        for spec in &imp.specifiers {
+            if past_first {
+                self.write(", ")?;
             } else {
-                self.write("{ ")?;
-                opened_brace = true;
-                self.write_import_specificer(first)?;
+                past_first = true;
             }
-        }
 
-        if !opened_brace {
-            if let Some(ref next) = specifiers.next() {
-                if let ImportSpecifier::Namespace(ref name) = next {
-                    self.write(", ")?;
-                    self.write_namespace_import(name)?;
-                } else {
-                    self.write(", { ")?;
-                    self.write_import_specificer(next)?;
-                    opened_brace = true;
-                }
-            }
+            self.write_import_specificer(spec)?;
         }
-
-        while let Some(ref s) = specifiers.next() {
-            self.write(", ")?;
-            self.write_import_specificer(s)?;
+        if imp.specifiers.len() != 0 {
+            self.write(" from ")?;
         }
-        if opened_brace {
-            self.write(" }")?;
-        }
-        self.write(" from ")?;
         self.write_literal(&imp.source)?;
         self.write_empty_stmt()?;
         Ok(())
@@ -390,7 +367,7 @@ impl<T: Write> Writer<T> {
         match spec {
             ImportSpecifier::Default(ref i) => self.write_ident(i)?,
             ImportSpecifier::Namespace(ref n) => self.write_namespace_import(n)?,
-            ImportSpecifier::Normal(ref n) => self.write_normal_import(&n.imported, &n.local)?,
+            ImportSpecifier::Normal(ref n) => self.write_normal_imports(n)?,
         }
         Ok(())
     }
@@ -404,6 +381,23 @@ impl<T: Write> Writer<T> {
         self.write_ident(name)?;
         Ok(())
     }
+
+    pub fn write_normal_imports(&mut self, imports: &[NormalImportSpec]) -> Res {
+        trace!("write_normal_imports");
+        self.write("{")?;
+        let mut past_first = false;
+        for import in imports {
+            if past_first {
+                self.write(", ")?;
+            } else {
+                past_first = true;
+            }
+            self.write_normal_import(&import.imported, &import.local)?;
+        }
+        self.write("}")?;
+        Ok(())
+    }
+
     /// Attempts to write the contents of`ImportSpecifier::Normal` to the `impl Write`
     /// ```js
     /// import {Thing as Stuff} from 'module';
@@ -411,8 +405,10 @@ impl<T: Write> Writer<T> {
     pub fn write_normal_import(&mut self, name: &Ident, local: &Ident) -> Res {
         trace!("write_normal_import");
         self.write_ident(&name)?;
-        self.write(" as ")?;
-        self.write_ident(&local)?;
+        if name != local {
+            self.write(" as ")?;
+            self.write_ident(&local)?;
+        }
         Ok(())
     }
     /// Attempts to write a directive to the `impl Write`
@@ -722,19 +718,12 @@ impl<T: Write> Writer<T> {
         }
         self.write(":")?;
         self.write_new_line()?;
-        self.current_indent += 1;
-        let mut decrease_indent = true;
+        self.increment_indent();
         for ref part in &case.consequent {
-            if let ProgramPart::Stmt(Stmt::Break(_)) = part {
-                self.current_indent = self.current_indent.saturating_sub(1);
-                decrease_indent = false;
-            }
             self._write_part(part)?;
             self.write_new_line()?;
         }
-        if decrease_indent {
-            self.current_indent = self.current_indent.saturating_sub(1);
-        }
+        self.decrement_indent();
         Ok(())
     }
     /// Attempts to write a throw statement
@@ -1182,6 +1171,7 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_rest_pattern_part(&mut self, pat: &Pat) -> Res {
         trace!("write_rest_pattern_part");
+        self.write("...")?;
         self.write_pattern(pat)?;
         Ok(())
     }
@@ -1344,7 +1334,10 @@ impl<T: Write> Writer<T> {
             }
             match prop {
                 ObjProp::Prop(ref p) => self.write_property(p),
-                ObjProp::Spread(ref e) => self.write_expr(e),
+                ObjProp::Spread(ref e) => {
+                    self.write("...")?;
+                    self.write_expr(e)
+                }
             }?;
         }
         self.write("}")?;
@@ -1646,13 +1639,13 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn write_conditional_expr(&mut self, conditional: &ConditionalExpr) -> Res {
         trace!("write_conditional_expr: {:?}", conditional);
-        if let Expr::Conditional(_) = &*conditional.test {
-            self.write_wrapped_expr(&conditional.test)?;
-        } else {
-            self.write_expr(&conditional.test)?;
+        match &*conditional.test {
+            Expr::Conditional(_) | Expr::Assign(_) => self.write_wrapped_expr(&conditional.test)?,
+            _ => self.write_expr(&conditional.test)?,
         }
         self.write(" ? ")?;
         if let Expr::Logical(_) = &*conditional.consequent {
+            log::debug!("logical consequent: {:?}", conditional.consequent);
             self.write_wrapped_expr(&conditional.consequent)?;
         } else {
             self.write_expr(&conditional.consequent)?;
@@ -1911,13 +1904,13 @@ impl<T: Write> Writer<T> {
     pub fn write_open_brace(&mut self) -> Res {
         trace!("write_open_brace");
         self.write("{")?;
-        self.current_indent += 1;
+        self.increment_indent();
         Ok(())
     }
 
     pub fn write_close_brace(&mut self) -> Res {
         trace!("write_close_brace");
-        self.current_indent -= 1;
+        self.decrement_indent();
         self.write_leading_whitespace()?;
         self.write("}")?;
         Ok(())
@@ -1958,6 +1951,24 @@ impl<T: Write> Writer<T> {
             CommentKind::Hashbang => self.write(&format!("#! {}", comment.content))?,
         }
         Ok(())
+    }
+
+    pub fn increment_indent(&mut self) {
+        log::trace!(
+            "increment_indent: {} -> {}",
+            self.current_indent,
+            self.current_indent.saturating_add(1)
+        );
+        self.current_indent += 1;
+    }
+
+    pub fn decrement_indent(&mut self) {
+        log::trace!(
+            "decrement_indent: {} -> {}",
+            self.current_indent,
+            self.current_indent.saturating_sub(1)
+        );
+        self.current_indent -= 1;
     }
 }
 

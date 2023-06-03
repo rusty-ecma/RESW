@@ -19,6 +19,6 @@ jobs:
     - name: Run tests
       run: cargo test --features=moz_central
       env:
-        RUST_MIN_STACK: 9999999
+        RUST_MIN_STACK: 99999999
     - name: Check syntax
       run: cargo fmt --all -- --check
