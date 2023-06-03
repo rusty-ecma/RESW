@@ -162,3 +162,27 @@ fn double_break_in_switch_case() {
     }";
     common::round_trip_validate(js, false, "double_break_in_switch_case").unwrap();
 }
+
+#[test]
+fn for_loop() {
+    let js = "for (let i = 0; i < 1; i++);";
+    common::round_trip_validate(js, false, "for_loop").unwrap();
+}
+
+#[test]
+fn call_args() {
+    let js = r#"call(/    /, '');"#;
+    common::round_trip_validate(js, false, "call_args").unwrap();
+}
+
+#[test]
+fn import_all_as_from() {
+    let js = r#"import * as i1 from 'module'"#;
+    common::round_trip_validate(js, true, "import_all_as_from").unwrap();
+}
+
+#[test]
+fn array_pat_with_empty_ele() {
+    let js = r#"let [x,,] = y;"#;
+    common::round_trip_validate(js, true, "array_pat_with_empty_ele").unwrap();
+}

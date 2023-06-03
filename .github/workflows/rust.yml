@@ -12,6 +12,8 @@ jobs:
     - name: Build
       run: cargo build
     - uses: actions/setup-node@v2
+    - name: install node modules
+      run: npm i
     - name: curl moz_central
       run: curl https://hg.mozilla.org/mozilla-central/archive/tip.zip/js/src/jit-test/tests/ --output moz-central.zip
     - name: unzip moz-central
