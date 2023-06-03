@@ -9,13 +9,14 @@ readme = "./README.md"
 repository = "https://github.com/rusty-ecma/RESW"
 
 [dependencies]
-resast = "0.5.0-alpha.3"
+resast = "0.6.0-alpha.3"
 log = "0.4"
 ress = "0.11"
 
 [dev-dependencies]
 rayon = { version = "1"}
-ressa = "0.8.0-alpha.5"
+# ressa = "0.9.0-alpha.1"
+ressa = { git = "https://github.com/rusty-ecma/RESSA", branch = "feat/smaller-ast" }
 pretty_env_logger = "0.4"
 thiserror = "1"
 

@@ -1,19 +1,30 @@
+use std::borrow::Cow;
+
 use resast::{Program, ProgramPart};
 use ressa::Parser;
 use resw::{write_str::WriteString, Writer};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
+    #[error("{0} <- Ressa")]
     Ressa(#[from] ressa::Error),
-    #[error("{0}")]
+    #[error("{0} <- Io")]
     Io(#[from] std::io::Error),
-    #[error("{0}")]
+    #[error("{0} <- Uft8")]
     Utf8(#[from] std::string::FromUtf8Error),
-    #[error("Mismatched parts:\n{left}\n{right}")]
+    #[error("\n{left}\n{right} <- Mismatched parts")]
     Mismatched { left: String, right: String },
-    #[error("paniced while parsing: {0}")]
+    #[error("{0} <- Panic")]
     Panic(String),
+}
+
+pub struct MismatchedError<T, U>
+where
+    T: std::fmt::Debug,
+    U: std::fmt::Debug,
+{
+    pub left: T,
+    pub right: U,
 }
 
 pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
@@ -74,8 +85,17 @@ pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
 
 pub fn round_trip_validate<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
     pretty_env_logger::try_init().ok();
-    round_trip_validate_bare(js, module, name)?;
-    round_trip_validate_spanned(js, module, name)
+    if std::env::var("RESW_SKIP_BARE_TEST") != Ok("1".to_string()) {
+        round_trip_validate_bare(js, module, name).map_err(|e| {
+            println!("Error validating bare!");
+            e
+        })?;
+    }
+    round_trip_validate_spanned(js, module, name).map_err(|e| {
+        println!("Error validating spanned!");
+        e
+    })?;
+    Ok(())
 }
 pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
     let write_failures = std::env::var("RESW_WRITE_FAILURES") == Ok("1".to_string());
@@ -99,23 +119,25 @@ pub fn round_trip_validate_bare<'a>(js: &'a str, module: bool, name: &str) -> Re
         }
     };
     if first_parts != second_parts {
-        let ret = find_mismatched(&first_parts, &second_parts).unwrap();
+        let MismatchedError { left, right } = find_mismatched(&first_parts, &second_parts).unwrap();
 
         if write_failures {
-            let to_write = if let Error::Mismatched { left, right } = &ret {
-                format!("//{}\n//{}\n\n{}", left, right, second_js)
-            } else {
-                second_js
-            };
+            let to_write = format!("//{:?}\n//{:?}\n\n{}", left, right, second_js);
             write_failure(name, &to_write, &None);
+            write_file(&format!("{:#?}", left), &format!("{}.l.ron", name));
+            write_file(&format!("{:#?}", right), &format!("{}.r.ron", name));
         }
-        return Err(ret);
+        return Err(Error::Mismatched {
+            left: format!("{left:?}"),
+            right: format!("{right:?}"),
+        });
     }
     if write_success {
         write_failure(name, &second_js, &None);
     }
     Ok(())
 }
+
 pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) -> Result<(), Error> {
     use resast::spanned::Program;
     use ressa::spanned::Parser;
@@ -150,20 +172,16 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
                 }
             };
             if first_parts != second_parts {
-                let ret = find_mismatched(&first_parts, &second_parts).unwrap();
+                let mismatched = find_mismatched(&first_parts, &second_parts).unwrap();
 
                 if write_failures {
-                    let to_write = if let Error::Mismatched { left, right } = &ret {
-                        format!("//{}\n//{}\n\n{}", left, right, second_js)
-                    } else {
-                        second_js
-                    };
                     let name = format!("{}-spanned", name);
-                    write_failure(&name, &to_write, &None);
-                    write_file(&format!("{:#?}", first_parts), &format!("{}.1.ron", name));
-                    write_file(&format!("{:#?}", second_parts), &format!("{}.2.ron", name));
+                    report_mismatch(&name, &second_js, &mismatched);
                 }
-                return Err(ret);
+                return Err(Error::Mismatched {
+                    left: format!("{:?}", mismatched.left),
+                    right: format!("{:?}", mismatched.right),
+                });
             }
             Ok(())
         }
@@ -186,15 +204,35 @@ pub fn round_trip_validate_spanned<'a>(js: &'a str, module: bool, name: &str) ->
     Ok(())
 }
 
-pub fn find_mismatched<T>(first_parts: &[T], second_parts: &[T]) -> Option<Error>
+pub fn report_mismatch<T: std::fmt::Debug>(
+    name: &str,
+    first_js: &str,
+    mismatched: &MismatchedError<T, T>,
+) {
+    let MismatchedError { left, right } = mismatched;
+    let to_write = format!("//{:?}\n//{:?}\n\n{}", left, right, first_js);
+    let name = format!("{}-spanned", name);
+
+    write_failure(&name, &to_write, &None);
+    write_file(
+        &format!("{:#?}", left),
+        &format!("{}-mismatch.left.ron", name),
+    );
+    write_file(
+        &format!("{:#?}", right),
+        &format!("{}-mismatch.right.ron", name),
+    );
+}
+
+pub fn find_mismatched<T>(first_parts: &[T], second_parts: &[T]) -> Option<MismatchedError<T, T>>
 where
-    T: PartialEq + std::fmt::Debug,
+    T: PartialEq + std::fmt::Debug + Clone,
 {
     for (lhs, rhs) in first_parts.into_iter().zip(second_parts.into_iter()) {
         if lhs != rhs {
-            return Some(Error::Mismatched {
-                left: format!("{:?}", lhs),
-                right: format!("{:?}", rhs),
+            return Some(MismatchedError {
+                left: lhs.clone(),
+                right: rhs.clone(),
             });
         }
     }
@@ -203,7 +241,7 @@ where
 
 pub fn parse<'a>(
     p: &'a mut Parser<'a, ressa::DefaultCommentHandler>,
-) -> Result<Vec<ProgramPart<'a>>, Error> {
+) -> Result<Vec<ProgramPart<Cow<'a, str>>>, Error> {
     match p.parse()? {
         Program::Mod(parts) => Ok(parts),
         Program::Script(parts) => Ok(parts),

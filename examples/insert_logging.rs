@@ -1,7 +1,8 @@
-use resast::prelude::*;
+use resast::{prelude::*, SourceText};
 use ressa::Parser;
 use resw::Writer;
 use std::{
+    borrow::Cow,
     fs::{read_to_string, File},
     io::BufWriter,
 };
@@ -22,7 +23,10 @@ fn main() {
     }
 }
 
-fn map_part<'a>(args: Vec<Expr<'a>>, part: ProgramPart<'a>) -> ProgramPart<'a> {
+fn map_part<'a>(
+    args: Vec<Expr<Cow<'a, str>>>,
+    part: ProgramPart<Cow<'a, str>>,
+) -> ProgramPart<Cow<'a, str>> {
     match part {
         ProgramPart::Decl(decl) => ProgramPart::Decl(map_decl(args, decl)),
         ProgramPart::Stmt(stmt) => ProgramPart::Stmt(map_stmt(args, stmt)),
@@ -30,7 +34,7 @@ fn map_part<'a>(args: Vec<Expr<'a>>, part: ProgramPart<'a>) -> ProgramPart<'a> {
     }
 }
 
-fn map_decl<'a>(mut args: Vec<Expr<'a>>, decl: Decl<'a>) -> Decl<'a> {
+fn map_decl<'a>(mut args: Vec<Expr<Cow<'a, str>>>, decl: Decl<Cow<'a, str>>) -> Decl<Cow<'a, str>> {
     match decl {
         Decl::Func(f) => Decl::Func(map_func(args, f)),
         Decl::Class(class) => Decl::Class(map_class(args, class)),
@@ -52,14 +56,14 @@ fn map_decl<'a>(mut args: Vec<Expr<'a>>, decl: Decl<'a>) -> Decl<'a> {
     }
 }
 
-fn map_stmt<'a>(args: Vec<Expr<'a>>, stmt: Stmt<'a>) -> Stmt<'a> {
+fn map_stmt<'a>(args: Vec<Expr<Cow<'a, str>>>, stmt: Stmt<Cow<'a, str>>) -> Stmt<Cow<'a, str>> {
     match stmt {
         Stmt::Expr(expr) => Stmt::Expr(map_expr(args, expr)),
         _ => stmt.clone(),
     }
 }
 
-fn map_expr<'a>(mut args: Vec<Expr<'a>>, expr: Expr<'a>) -> Expr<'a> {
+fn map_expr<'a>(mut args: Vec<Expr<Cow<'a, str>>>, expr: Expr<Cow<'a, str>>) -> Expr<Cow<'a, str>> {
     match expr {
         Expr::Func(f) => Expr::Func(map_func(args, f)),
         Expr::Class(c) => Expr::Class(map_class(args, c)),
@@ -75,7 +79,10 @@ fn map_expr<'a>(mut args: Vec<Expr<'a>>, expr: Expr<'a>) -> Expr<'a> {
     }
 }
 
-fn map_func<'a>(mut args: Vec<Expr<'a>>, mut func: Func<'a>) -> Func<'a> {
+fn map_func<'a>(
+    mut args: Vec<Expr<Cow<'a, str>>>,
+    mut func: Func<Cow<'a, str>>,
+) -> Func<Cow<'a, str>> {
     if let Some(ref id) = &func.id {
         args.push(ident_to_string_lit(id));
     }
@@ -99,7 +106,10 @@ fn map_func<'a>(mut args: Vec<Expr<'a>>, mut func: Func<'a>) -> Func<'a> {
     func
 }
 
-fn map_class<'a>(mut args: Vec<Expr<'a>>, mut class: Class<'a>) -> Class<'a> {
+fn map_class<'a>(
+    mut args: Vec<Expr<Cow<'a, str>>>,
+    mut class: Class<Cow<'a, str>>,
+) -> Class<Cow<'a, str>> {
     if let Some(ref id) = class.id {
         args.push(ident_to_string_lit(id))
     }
@@ -111,26 +121,29 @@ fn map_class<'a>(mut args: Vec<Expr<'a>>, mut class: Class<'a>) -> Class<'a> {
     class
 }
 
-fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
+fn map_class_prop<'a>(
+    mut args: Vec<Expr<Cow<'a, str>>>,
+    mut prop: Prop<Cow<'a, str>>,
+) -> Prop<Cow<'a, str>> {
     match prop.kind {
         PropKind::Ctor => {
             args.insert(
                 args.len().saturating_sub(1),
-                Expr::Lit(Lit::String(StringLit::single_from("new"))),
+                Expr::Lit(Lit::String(StringLit::single_from("new".into()))),
             );
         }
         PropKind::Get => {
-            args.push(Expr::Lit(Lit::String(StringLit::single_from("get"))));
+            args.push(Expr::Lit(Lit::String(StringLit::single_from("get".into()))));
         }
         PropKind::Set => {
-            args.push(Expr::Lit(Lit::String(StringLit::single_from("set"))));
+            args.push(Expr::Lit(Lit::String(StringLit::single_from("set".into()))));
         }
         _ => (),
     };
     match &prop.key {
         PropKey::Expr(ref expr) => match expr {
             Expr::Ident(ref i) => {
-                if i.name != "constructor" {
+                if i.name.as_ref() != "constructor" {
                     args.push(ident_to_string_lit(i));
                 }
             }
@@ -141,9 +154,9 @@ fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
                 args.push(Expr::Lit(l.clone()))
             }
             Lit::Null => {
-                args.push(Expr::Lit(Lit::String(StringLit::Single(
+                args.push(Expr::Lit(Lit::String(StringLit::Single(SourceText(
                     ::std::borrow::Cow::Owned(String::from("null")),
-                ))));
+                )))));
             }
             _ => (),
         },
@@ -158,7 +171,10 @@ fn map_class_prop<'a>(mut args: Vec<Expr<'a>>, mut prop: Prop<'a>) -> Prop<'a> {
     prop
 }
 
-fn map_arrow_func<'a>(mut args: Vec<Expr<'a>>, mut f: ArrowFuncExpr<'a>) -> ArrowFuncExpr<'a> {
+fn map_arrow_func<'a>(
+    mut args: Vec<Expr<Cow<'a, str>>>,
+    mut f: ArrowFuncExpr<Cow<'a, str>>,
+) -> ArrowFuncExpr<Cow<'a, str>> {
     args.extend(extract_idents_from_args(&f.params));
     match &mut f.body {
         ArrowFuncBody::FuncBody(ref mut body) => {
@@ -174,7 +190,7 @@ fn map_arrow_func<'a>(mut args: Vec<Expr<'a>>, mut f: ArrowFuncExpr<'a>) -> Arro
     f
 }
 
-fn assign_left_to_string_lit<'a>(left: &AssignLeft<'a>) -> Option<Expr<'a>> {
+fn assign_left_to_string_lit<'a>(left: &AssignLeft<Cow<'a, str>>) -> Option<Expr<Cow<'a, str>>> {
     match left {
         AssignLeft::Expr(expr) => expr_to_string_lit(expr),
         AssignLeft::Pat(pat) => match pat {
@@ -184,7 +200,7 @@ fn assign_left_to_string_lit<'a>(left: &AssignLeft<'a>) -> Option<Expr<'a>> {
     }
 }
 
-fn extract_idents_from_args<'a>(args: &[FuncArg<'a>]) -> Vec<Expr<'a>> {
+fn extract_idents_from_args<'a>(args: &[FuncArg<Cow<'a, str>>]) -> Vec<Expr<Cow<'a, str>>> {
     let mut ret = vec![];
     for arg in args {
         match arg {
@@ -195,14 +211,14 @@ fn extract_idents_from_args<'a>(args: &[FuncArg<'a>]) -> Vec<Expr<'a>> {
     ret.into_iter().filter_map(|e| e).collect()
 }
 
-fn extract_ident_from_expr<'a>(expr: &Expr<'a>) -> Option<Expr<'a>> {
+fn extract_ident_from_expr<'a>(expr: &Expr<Cow<'a, str>>) -> Option<Expr<Cow<'a, str>>> {
     match expr {
         Expr::Ident(ident) => Some(Expr::Ident(ident.clone())),
         _ => None,
     }
 }
 
-fn extract_idents_from_pat<'a>(pat: &Pat<'a>) -> Vec<Option<Expr<'a>>> {
+fn extract_idents_from_pat<'a>(pat: &Pat<Cow<'a, str>>) -> Vec<Option<Expr<Cow<'a, str>>>> {
     match pat {
         Pat::Ident(i) => {
             vec![Some(Expr::Ident(i.clone()))]
@@ -239,14 +255,14 @@ fn extract_idents_from_pat<'a>(pat: &Pat<'a>) -> Vec<Option<Expr<'a>>> {
     }
 }
 
-fn expr_to_string_lit<'a>(e: &Expr<'a>) -> Option<Expr<'a>> {
+fn expr_to_string_lit<'a>(e: &Expr<Cow<'a, str>>) -> Option<Expr<Cow<'a, str>>> {
     let inner = expr_to_string(e)?;
-    Some(Expr::Lit(Lit::String(StringLit::Single(
+    Some(Expr::Lit(Lit::String(StringLit::Single(SourceText(
         ::std::borrow::Cow::Owned(inner),
-    ))))
+    )))))
 }
 
-fn expr_to_string(expr: &Expr) -> Option<String> {
+fn expr_to_string<'a>(expr: &Expr<Cow<'a, str>>) -> Option<String> {
     match expr {
         Expr::Ident(ref ident) => Some(ident.name.to_string()),
         Expr::This => Some("this".to_string()),
@@ -266,7 +282,13 @@ fn expr_to_string(expr: &Expr) -> Option<String> {
         Expr::Lit(lit) => match lit {
             Lit::String(s) => Some(s.clone_inner().to_string()),
             Lit::Number(n) => Some(n.to_string()),
-            Lit::RegEx(r) => Some(format!("/{}/{}", r.pattern, r.flags)),
+            Lit::RegEx(r) => {
+                if let Some(flags) = &r.flags {
+                    Some(format!("/{}/{}", r.pattern, flags))
+                } else {
+                    Some(format!("/{}/", r.pattern))
+                }
+            }
             Lit::Boolean(b) => Some(b.to_string()),
             Lit::Null => Some("null".to_string()),
             _ => None,
@@ -275,24 +297,27 @@ fn expr_to_string(expr: &Expr) -> Option<String> {
     }
 }
 
-fn ident_to_string_lit<'a>(i: &Ident<'a>) -> Expr<'a> {
+fn ident_to_string_lit<'a>(i: &Ident<Cow<'a, str>>) -> Expr<Cow<'a, str>> {
     Expr::Lit(Lit::String(StringLit::Single(i.name.clone())))
 }
 
-fn insert_expr_into_func<'a>(expr: ProgramPart<'a>, func: &mut Func<'a>) {
+fn insert_expr_into_func<'a>(expr: ProgramPart<Cow<'a, str>>, func: &mut Func<Cow<'a, str>>) {
     insert_expr_into_func_body(expr, &mut func.body);
 }
 
-fn insert_expr_into_func_body<'a>(expr: ProgramPart<'a>, body: &mut FuncBody<'a>) {
+fn insert_expr_into_func_body<'a>(
+    expr: ProgramPart<Cow<'a, str>>,
+    body: &mut FuncBody<Cow<'a, str>>,
+) {
     body.0.insert(0, expr);
 }
 
-pub fn console_log<'a>(args: Vec<Expr<'a>>) -> ProgramPart<'a> {
+pub fn console_log<'a>(args: Vec<Expr<Cow<'a, str>>>) -> ProgramPart<Cow<'a, str>> {
     ProgramPart::Stmt(Stmt::Expr(Expr::Call(CallExpr {
         callee: Box::new(Expr::Member(MemberExpr {
             computed: false,
-            object: Box::new(Expr::ident_from("console")),
-            property: Box::new(Expr::ident_from("log")),
+            object: Box::new(Expr::Ident(Cow::Borrowed("console").into())),
+            property: Box::new(Expr::Ident(Cow::Borrowed("log").into())),
         })),
         arguments: args,
     })))
