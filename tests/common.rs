@@ -26,7 +26,7 @@ where
     pub left: T,
     pub right: U,
 }
-
+#[allow(dead_code)]
 pub fn double_round_trip(js: &str, module: bool) -> (String, Option<String>) {
     let mut first_write = WriteString::new();
     let mut second_write = WriteString::new();
