@@ -1,4 +1,4 @@
-use resast::{prelude::*, SourceText};
+use resast::prelude::*;
 use ressa::Parser;
 use resw::Writer;
 use std::{
@@ -154,9 +154,9 @@ fn map_class_prop<'a>(
                 args.push(Expr::Lit(l.clone()))
             }
             Lit::Null => {
-                args.push(Expr::Lit(Lit::String(StringLit::Single(SourceText(
+                args.push(Expr::Lit(Lit::String(StringLit::Single(
                     ::std::borrow::Cow::Owned(String::from("null")),
-                )))));
+                ))));
             }
             _ => (),
         },
@@ -257,9 +257,9 @@ fn extract_idents_from_pat<'a>(pat: &Pat<Cow<'a, str>>) -> Vec<Option<Expr<Cow<'
 
 fn expr_to_string_lit<'a>(e: &Expr<Cow<'a, str>>) -> Option<Expr<Cow<'a, str>>> {
     let inner = expr_to_string(e)?;
-    Some(Expr::Lit(Lit::String(StringLit::Single(SourceText(
+    Some(Expr::Lit(Lit::String(StringLit::Single(
         ::std::borrow::Cow::Owned(inner),
-    )))))
+    ))))
 }
 
 fn expr_to_string<'a>(expr: &Expr<Cow<'a, str>>) -> Option<String> {
